@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { WATERING_METHODS, initialPlants } from '../data/initialPlants'
 
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234'
@@ -21,7 +21,7 @@ const BLANK_PLANT = {
   nextWaterDate: null,
 }
 
-export default function AdminPanel({ plants, trip, addPlant, updatePlant, deactivatePlant, reactivatePlant, setTrip, clearTrip, onClose, isAuthed, onAdminAuth, directEditPlant, log = [], logWateringOnDate, updateWateringEntry, deleteWateringEntry }) {
+export default function AdminPanel({ plants, trip, addPlant, updatePlant, deactivatePlant, reactivatePlant, setTrip, clearTrip, onClose, isAuthed, onAdminAuth, directEditPlant, log = [], logWateringOnDate, updateWateringEntry, deleteWateringEntry, notifSettings, saveNotifSettings }) {
   const [pin, setPin] = useState('')
   const [authed, setAuthed] = useState(() => isAuthed ?? false)
   const [pinError, setPinError] = useState(false)
@@ -43,6 +43,7 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
   })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [notifForm, setNotifForm] = useState(null)
 
   function toInputDate(d) {
     return new Date(d).toISOString().split('T')[0]
@@ -143,6 +144,16 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
     setTimeout(() => setMsg(''), 3000)
   }
 
+  useEffect(() => {
+    if (notifSettings && !notifForm) setNotifForm(notifSettings)
+  }, [notifSettings])
+
+  async function saveNotif() {
+    if (!notifForm || !saveNotifSettings) return
+    await saveNotifSettings(notifForm)
+    flash('Notification settings saved')
+  }
+
   if (!authed) {
     return (
       <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -214,6 +225,51 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="admin-section">
+                <h3>Notifications</h3>
+                {!notifForm ? (
+                  <p className="text-muted">Loading…</p>
+                ) : (
+                  <>
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={notifForm.enabled}
+                        onChange={e => setNotifForm(f => ({ ...f, enabled: e.target.checked }))}
+                      />
+                      Send daily watering reminders
+                    </label>
+                    <span className="form-hint">When enabled, an email is sent each morning at 8 am (Pacific) listing plants that need water. Turn on before you travel, off when you return.</span>
+                    {notifForm.enabled && (
+                      <div className="form-grid" style={{ marginTop: 12 }}>
+                        <label className="form-label form-label--full">Notify email
+                          <input
+                            className="input"
+                            type="email"
+                            value={notifForm.recipientEmail}
+                            onChange={e => setNotifForm(f => ({ ...f, recipientEmail: e.target.value }))}
+                            placeholder="mills.colleenk@gmail.com"
+                          />
+                        </label>
+                        <label className="form-label form-label--full">Send from (your Gmail)
+                          <input
+                            className="input"
+                            type="email"
+                            value={notifForm.senderEmail}
+                            onChange={e => setNotifForm(f => ({ ...f, senderEmail: e.target.value }))}
+                            placeholder="brock.gonzales@gmail.com"
+                          />
+                          <span className="form-hint">Must be the Gmail account whose App Password was configured.</span>
+                        </label>
+                      </div>
+                    )}
+                    <button className="btn btn--primary" style={{ marginTop: 12 }} onClick={saveNotif}>
+                      Save Notifications
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}

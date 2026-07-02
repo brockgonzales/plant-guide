@@ -3,6 +3,7 @@ import { isConfigured } from './firebase'
 import { usePlants } from './hooks/usePlants'
 import { useWateringLog } from './hooks/useWateringLog'
 import { useTrip } from './hooks/useTrip'
+import { useSettings } from './hooks/useSettings'
 import Header from './components/Header'
 import TripBanner from './components/TripBanner'
 import TodayTasks from './components/TodayTasks'
@@ -23,6 +24,7 @@ export default function App() {
     getLastWatered, getWateringStatus, getNextWaterDate, isDueToday, wasWateredToday,
   } = useWateringLog()
   const { trip, setTrip, clearTrip, getTripStatus } = useTrip()
+  const { notifSettings, saveNotifSettings } = useSettings()
 
   const tripStatus = getTripStatus()
 
@@ -141,6 +143,8 @@ export default function App() {
           isAuthed={isAdmin}
           onAdminAuth={() => setIsAdmin(true)}
           directEditPlant={adminDirectPlant}
+          notifSettings={notifSettings}
+          saveNotifSettings={saveNotifSettings}
           log={log}
           logWateringOnDate={logWateringOnDate}
           updateWateringEntry={updateWateringEntry}
