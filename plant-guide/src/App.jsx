@@ -18,10 +18,22 @@ export default function App() {
   const [adminDirectPlant, setAdminDirectPlant] = useState(null)
 
   const { plants, loading: plantsLoading, addPlant, updatePlant, deactivatePlant, reactivatePlant } = usePlants()
-  const { log, logWatering, getLastWatered, getWateringStatus, getNextWaterDate, isDueToday, wasWateredToday } = useWateringLog()
+  const {
+    log, logWatering, logWateringOnDate, updateWateringEntry, deleteWateringEntry,
+    getLastWatered, getWateringStatus, getNextWaterDate, isDueToday, wasWateredToday,
+  } = useWateringLog()
   const { trip, setTrip, clearTrip, getTripStatus } = useTrip()
 
   const tripStatus = getTripStatus()
+
+  // Clears nextWaterDate override after watering so the schedule resumes normally
+  async function handleLogWatering(plantId) {
+    await logWatering(plantId)
+    const plant = plants.find(p => p.id === plantId)
+    if (plant?.nextWaterDate) {
+      updatePlant(plantId, { nextWaterDate: null })
+    }
+  }
 
   function handleEditPlant(plant) {
     setSelectedPlant(null)
@@ -77,7 +89,8 @@ export default function App() {
             plants={plants}
             isDueToday={isDueToday}
             wasWateredToday={wasWateredToday}
-            logWatering={logWatering}
+            logWatering={handleLogWatering}
+            getLastWatered={getLastWatered}
             getNextWaterDate={getNextWaterDate}
             onPlantClick={setSelectedPlant}
           />
@@ -106,7 +119,7 @@ export default function App() {
           status={getWateringStatus(selectedPlant)}
           lastWatered={getLastWatered(selectedPlant.id)}
           log={log}
-          logWatering={logWatering}
+          logWatering={handleLogWatering}
           onClose={() => setSelectedPlant(null)}
           isAdmin={isAdmin}
           onEditPlant={handleEditPlant}
@@ -127,6 +140,10 @@ export default function App() {
           isAuthed={isAdmin}
           onAdminAuth={() => setIsAdmin(true)}
           directEditPlant={adminDirectPlant}
+          log={log}
+          logWateringOnDate={logWateringOnDate}
+          updateWateringEntry={updateWateringEntry}
+          deleteWateringEntry={deleteWateringEntry}
         />
       )}
     </div>

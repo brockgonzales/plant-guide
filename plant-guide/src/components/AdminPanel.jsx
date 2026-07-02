@@ -18,9 +18,10 @@ const BLANK_PLANT = {
   isActive: true,
   hasPhoto: false,
   photoPath: '',
+  nextWaterDate: null,
 }
 
-export default function AdminPanel({ plants, trip, addPlant, updatePlant, deactivatePlant, reactivatePlant, setTrip, clearTrip, onClose, isAuthed, onAdminAuth, directEditPlant }) {
+export default function AdminPanel({ plants, trip, addPlant, updatePlant, deactivatePlant, reactivatePlant, setTrip, clearTrip, onClose, isAuthed, onAdminAuth, directEditPlant, log = [], logWateringOnDate, updateWateringEntry, deleteWateringEntry }) {
   const [pin, setPin] = useState('')
   const [authed, setAuthed] = useState(() => isAuthed ?? false)
   const [pinError, setPinError] = useState(false)
@@ -32,6 +33,8 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
       : BLANK_PLANT
   )
   const [warningInput, setWarningInput] = useState('')
+  const [logEdits, setLogEdits] = useState({})
+  const [newLogDate, setNewLogDate] = useState('')
   const [tripForm, setTripForm] = useState({
     destination: trip?.destination ?? '',
     startDate: trip?.startDate ? toInputDate(trip.startDate) : '',
@@ -82,6 +85,30 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
     setPlantForm(p => ({ ...p, warnings: p.warnings.filter((_, idx) => idx !== i) }))
   }
 
+  const plantLog = editingPlant
+    ? log.filter(e => e.plantId === editingPlant.id).slice(0, 10)
+    : []
+
+  function toLogDate(entry) {
+    const d = entry.wateredAt?.toDate?.()
+    if (!d) return ''
+    return d.toISOString().split('T')[0]
+  }
+
+  async function saveLogEntry(entry) {
+    const dateVal = logEdits[entry.id] ?? toLogDate(entry)
+    await updateWateringEntry(entry.id, dateVal)
+    setLogEdits(prev => { const n = { ...prev }; delete n[entry.id]; return n })
+    flash('Entry updated')
+  }
+
+  async function addPastWatering() {
+    if (!newLogDate || !editingPlant) return
+    await logWateringOnDate(editingPlant.id, newLogDate)
+    setNewLogDate('')
+    flash('Watering entry added')
+  }
+
   async function savePlant() {
     setSaving(true)
     const data = {
@@ -89,6 +116,7 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
       number: parseInt(plantForm.number),
       wateringIntervalDays: parseInt(plantForm.wateringIntervalDays),
       wateringIntervalMaxDays: parseInt(plantForm.wateringIntervalMaxDays),
+      nextWaterDate: plantForm.nextWaterDate || null,
     }
     if (view === 'add-plant') {
       data.id = `plant-${data.number}`
@@ -251,11 +279,55 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
                     <button className="btn btn--sm" onClick={addWarning}>Add</button>
                   </div>
                 </div>
+
+                <label className="form-label form-label--full">Override next water date
+                  <input
+                    className="input"
+                    type="date"
+                    value={plantForm.nextWaterDate || ''}
+                    onChange={e => pfChange('nextWaterDate', e.target.value || null)}
+                  />
+                  <span className="form-hint">Set to force a specific next-water date. Clears automatically when plant is watered. Leave blank to use the calculated schedule.</span>
+                </label>
               </div>
 
               <button className="btn btn--primary btn--full" onClick={savePlant} disabled={saving}>
                 {saving ? 'Saving...' : 'Save Plant'}
               </button>
+
+              {view === 'edit-plant' && (
+                <div className="admin-section admin-section--log">
+                  <h3>Watering History</h3>
+                  {plantLog.length === 0 && <p className="text-muted">No history in the last 90 days.</p>}
+                  {plantLog.map(entry => {
+                    const dateVal = logEdits[entry.id] ?? toLogDate(entry)
+                    return (
+                      <div key={entry.id} className="log-edit-row">
+                        <input
+                          className="input input--date-sm"
+                          type="date"
+                          value={dateVal}
+                          onChange={e => setLogEdits(prev => ({ ...prev, [entry.id]: e.target.value }))}
+                        />
+                        <button className="btn btn--sm btn--success" onClick={() => saveLogEntry(entry)}>Save</button>
+                        <button className="btn btn--sm btn--danger" onClick={async () => { await deleteWateringEntry(entry.id); flash('Entry deleted') }}>Delete</button>
+                      </div>
+                    )
+                  })}
+                  <div className="log-add-row">
+                    <span className="form-label__text">Add past watering</span>
+                    <div className="log-edit-row">
+                      <input
+                        className="input input--date-sm"
+                        type="date"
+                        value={newLogDate}
+                        onChange={e => setNewLogDate(e.target.value)}
+                      />
+                      <button className="btn btn--sm btn--primary" onClick={addPastWatering}>+ Add</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 

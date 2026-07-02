@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { WATERING_METHODS } from '../data/initialPlants'
 
-export default function TodayTasks({ plants, isDueToday, wasWateredToday, logWatering, getNextWaterDate, onPlantClick }) {
+export default function TodayTasks({ plants, isDueToday, wasWateredToday, logWatering, getLastWatered, getNextWaterDate, onPlantClick }) {
   const [confirming, setConfirming] = useState(null)
 
   const activePlants = plants.filter(p => p.isActive)
@@ -16,7 +16,30 @@ export default function TodayTasks({ plants, isDueToday, wasWateredToday, logWat
 
   const methodLabel = m => WATERING_METHODS[m] ?? m
 
-  function nextWaterLabel(plant) {
+  function fmtLastWatered(plant) {
+    const last = getLastWatered(plant.id)
+    if (!last) return 'No record'
+    const days = Math.floor((new Date() - last) / 86400000)
+    if (days === 0) return 'Today'
+    if (days === 1) return 'Yesterday'
+    return last.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  function fmtNextWater(plant) {
+    const next = getNextWaterDate(plant)
+    if (!next) return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const nextDay = new Date(next)
+    nextDay.setHours(0, 0, 0, 0)
+    const diff = Math.floor((nextDay - today) / 86400000)
+    if (diff < 0) return `${Math.abs(diff)}d overdue`
+    if (diff === 0) return 'Today'
+    if (diff === 1) return 'Tomorrow'
+    return next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  function fmtNextWaterPill(plant) {
     const next = getNextWaterDate(plant)
     if (!next) return null
     const today = new Date()
@@ -78,7 +101,17 @@ export default function TodayTasks({ plants, isDueToday, wasWateredToday, logWat
                   </div>
                 </div>
                 <div className="task-card__instruction">{plant.simpleInstruction}</div>
-                {plant.warnings.length > 0 && (
+                <div className="task-card__water-dates">
+                  <div>
+                    <div className="task-card__water-label">Last watered</div>
+                    <div className="task-card__water-value">{fmtLastWatered(plant)}</div>
+                  </div>
+                  <div>
+                    <div className="task-card__water-label">Should water</div>
+                    <div className="task-card__water-value">{fmtNextWater(plant)}</div>
+                  </div>
+                </div>
+                {plant.warnings && plant.warnings.length > 0 && (
                   <div className="task-card__warnings">
                     {plant.warnings.map((w, i) => (
                       <div key={i} className="warning-pill">⚠️ {w}</div>
@@ -103,7 +136,7 @@ export default function TodayTasks({ plants, isDueToday, wasWateredToday, logWat
           <h3 className="watered-today__title">Completed today</h3>
           <div className="watered-today__list">
             {wateredToday.map(plant => {
-              const next = nextWaterLabel(plant)
+              const next = fmtNextWaterPill(plant)
               return (
                 <div key={plant.id} className="watered-pill" onClick={() => onPlantClick(plant)}>
                   <span className="watered-pill__check">✓</span>
