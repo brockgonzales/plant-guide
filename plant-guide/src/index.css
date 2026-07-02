@@ -162,6 +162,7 @@ input, select, textarea { font: inherit; }
 .badge--due     { background: var(--red-bg); color: var(--red); }
 .badge--done    { background: var(--green-100); color: var(--green-700); }
 .badge--neutral { background: var(--border); color: var(--text-mid); }
+.badge--active  { background: var(--green-100); color: var(--green-700); }
 
 /* ── Today Tasks ───────────────────────────────────────────────── */
 .today-tasks { margin-bottom: 24px; }
@@ -661,6 +662,9 @@ input, select, textarea { font: inherit; }
 }
 .admin-section:last-child { border-bottom: none; }
 .admin-section h3 { font-size: 14px; font-weight: 700; color: var(--text-mid); margin-bottom: 10px; }
+.admin-section__title-row { display: flex; align-items: center; gap: 8px; }
+.notif-save-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.notif-saved-msg { font-size: 13px; color: var(--green-700); font-weight: 600; }
 
 .admin-trip-info { font-size: 14px; color: var(--text-mid); }
 .admin-trip-info p { margin-bottom: 4px; }

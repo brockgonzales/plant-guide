@@ -44,6 +44,7 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [notifForm, setNotifForm] = useState(null)
+  const [notifSaved, setNotifSaved] = useState(false)
 
   function toInputDate(d) {
     return new Date(d).toISOString().split('T')[0]
@@ -151,7 +152,8 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
   async function saveNotif() {
     if (!notifForm || !saveNotifSettings) return
     await saveNotifSettings(notifForm)
-    flash('Notification settings saved')
+    setNotifSaved(true)
+    setTimeout(() => setNotifSaved(false), 3000)
   }
 
   if (!authed) {
@@ -228,7 +230,10 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
               </div>
 
               <div className="admin-section">
-                <h3>Notifications</h3>
+                <h3 className="admin-section__title-row">
+                  Notifications
+                  {notifForm?.enabled && <span className="badge badge--active">Active</span>}
+                </h3>
                 {!notifForm ? (
                   <p className="text-muted">Loading…</p>
                 ) : (
@@ -265,9 +270,12 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
                         </label>
                       </div>
                     )}
-                    <button className="btn btn--primary" style={{ marginTop: 12 }} onClick={saveNotif}>
-                      Save Notifications
-                    </button>
+                    <div className="notif-save-row">
+                      <button className="btn btn--primary" onClick={saveNotif}>
+                        {notifSaved ? '✓ Saved' : 'Save Notifications'}
+                      </button>
+                      {notifSaved && <span className="notif-saved-msg">Settings saved</span>}
+                    </div>
                   </>
                 )}
               </div>
