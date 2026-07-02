@@ -116,7 +116,7 @@ exports.dailyWateringNotification = onSchedule(
             <tbody>${plantRows}</tbody>
           </table>
           <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee;">
-            <a href="https://nbrs5fydfg-dot.github.io/plant-guide/"
+            <a href="https://brockgonzales.github.io/plant-guide/"
                style="display:inline-block;background:#2D6A4F;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;">
               Open Plant Guide →
             </a>

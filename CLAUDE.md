@@ -4,8 +4,8 @@
 
 A digital plant care guide web app built so Brock's housemate can care for ~28 houseplants while Brock travels internationally. Brock can check in from abroad via the same app. The goal was a simple, photo-first interface that requires zero plant knowledge to follow.
 
-**Live URL:** https://nbrs5fydfg-dot.github.io/plant-guide/
-**GitHub repo:** https://github.com/nbrs5fydfg-dot/plant-guide
+**Live URL:** https://brockgonzales.github.io/plant-guide/
+**GitHub repo:** https://github.com/brockgonzales/plant-guide
 **Local root:** `/Users/brockgonzales/Documents/Claude/Projects/Plants/`
 
 ---
