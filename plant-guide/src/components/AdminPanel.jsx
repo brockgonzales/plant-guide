@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { httpsCallable } from 'firebase/functions'
+import { fns } from '../firebase'
 import { WATERING_METHODS, initialPlants } from '../data/initialPlants'
 
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234'
@@ -45,6 +47,8 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
   const [msg, setMsg] = useState('')
   const [notifForm, setNotifForm] = useState(null)
   const [notifSaved, setNotifSaved] = useState(false)
+  const [testSending, setTestSending] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
 
   function toInputDate(d) {
     return new Date(d).toISOString().split('T')[0]
@@ -154,6 +158,20 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
     await saveNotifSettings(notifForm)
     setNotifSaved(true)
     setTimeout(() => setNotifSaved(false), 3000)
+  }
+
+  async function sendTestEmail() {
+    setTestSending(true)
+    setTestMsg('')
+    try {
+      const fn = httpsCallable(fns, 'sendTestNotification')
+      await fn()
+      setTestMsg('Test email sent!')
+    } catch {
+      setTestMsg('Failed to send — check email settings and try again.')
+    }
+    setTestSending(false)
+    setTimeout(() => setTestMsg(''), 5000)
   }
 
   if (!authed) {
@@ -275,6 +293,12 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
                         {notifSaved ? '✓ Saved' : 'Save Notifications'}
                       </button>
                       {notifSaved && <span className="notif-saved-msg">Settings saved</span>}
+                    </div>
+                    <div className="notif-save-row" style={{ marginTop: 8 }}>
+                      <button className="btn btn--sm" onClick={sendTestEmail} disabled={testSending}>
+                        {testSending ? 'Sending…' : 'Send Test Email'}
+                      </button>
+                      {testMsg && <span className="notif-saved-msg">{testMsg}</span>}
                     </div>
                   </>
                 )}
