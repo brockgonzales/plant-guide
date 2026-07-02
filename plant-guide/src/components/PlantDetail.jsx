@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { WATERING_METHODS } from '../data/initialPlants'
 
-export default function PlantDetail({ plant, status, lastWatered, log, logWatering, onClose, isAdmin, onEditPlant }) {
+export default function PlantDetail({ plant, status, lastWatered, nextWaterDate, log, logWatering, onClose, isAdmin, onEditPlant }) {
   const [watering, setWatering] = useState(false)
 
   if (!plant) return null
@@ -89,6 +89,11 @@ export default function PlantDetail({ plant, status, lastWatered, log, logWateri
                 <div className="modal__last-watered">
                   Last watered: <strong>{fmtDate(lastWatered)}</strong>
                 </div>
+                {nextWaterDate && (
+                  <div className="modal__next-water">
+                    Next water: <strong>{fmtDate(nextWaterDate)}</strong>
+                  </div>
+                )}
                 {recentLog.length > 0 ? (
                   <ul className="watering-log">
                     {recentLog.map(entry => (

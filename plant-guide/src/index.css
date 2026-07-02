@@ -545,7 +545,8 @@ input, select, textarea { font: inherit; }
 .modal__instruction { font-size: 15px; color: var(--text); line-height: 1.6; margin-bottom: 8px; }
 .modal__frequency { font-size: 13px; color: var(--text-mid); }
 .modal__care-notes { font-size: 14px; color: var(--text-mid); line-height: 1.6; margin-top: 4px; }
-.modal__last-watered { font-size: 14px; color: var(--text-mid); margin-bottom: 8px; }
+.modal__last-watered { font-size: 14px; color: var(--text-mid); margin-bottom: 4px; }
+.modal__next-water { font-size: 14px; color: var(--magenta); font-weight: 700; margin-bottom: 8px; }
 
 /* ── Alerts ────────────────────────────────────────────────────── */
 .alert {

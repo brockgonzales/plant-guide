@@ -118,6 +118,7 @@ export default function App() {
           plant={selectedPlant}
           status={getWateringStatus(selectedPlant)}
           lastWatered={getLastWatered(selectedPlant.id)}
+          nextWaterDate={getNextWaterDate(selectedPlant)}
           log={log}
           logWatering={handleLogWatering}
           onClose={() => setSelectedPlant(null)}
