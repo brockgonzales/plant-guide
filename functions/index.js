@@ -3,11 +3,11 @@ const { onCall } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 const { initializeApp } = require('firebase-admin/app')
 const { getFirestore, Timestamp } = require('firebase-admin/firestore')
-const nodemailer = require('nodemailer')
+const sgMail = require('@sendgrid/mail')
 
 initializeApp()
 
-const GMAIL_APP_PASSWORD = defineSecret('GMAIL_APP_PASSWORD')
+const SENDGRID_API_KEY = defineSecret('SENDGRID_API_KEY')
 
 // ── Shared helpers ────────────────────────────────────────────────
 
@@ -136,14 +136,11 @@ async function loadData(db) {
   return { enabled, recipientEmail, senderEmail, plants, log }
 }
 
-async function sendEmail(senderEmail, recipientEmail, subject, html, password) {
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: senderEmail, pass: password },
-  })
-  await transporter.sendMail({
-    from: `Brock's Plants <${senderEmail}>`,
+async function sendEmail(senderEmail, recipientEmail, subject, html, apiKey) {
+  sgMail.setApiKey(apiKey)
+  await sgMail.send({
     to: recipientEmail,
+    from: { name: "Brock's Plants", email: senderEmail },
     subject,
     html,
   })
@@ -155,7 +152,7 @@ exports.dailyWateringNotification = onSchedule(
   {
     schedule: '0 8 * * *',
     timeZone: 'America/Los_Angeles',
-    secrets: [GMAIL_APP_PASSWORD],
+    secrets: [SENDGRID_API_KEY],
   },
   async () => {
     const db = getFirestore()
@@ -166,7 +163,7 @@ exports.dailyWateringNotification = onSchedule(
     if (!duePlants.length) return
 
     const { subject, html } = buildEmail(duePlants, log)
-    await sendEmail(senderEmail, recipientEmail, subject, html, GMAIL_APP_PASSWORD.value())
+    await sendEmail(senderEmail, recipientEmail, subject, html, SENDGRID_API_KEY.value())
     console.log(`Sent to ${recipientEmail} for ${duePlants.length} plants`)
   }
 )
@@ -174,14 +171,14 @@ exports.dailyWateringNotification = onSchedule(
 // ── On-demand test email (called from Admin Panel) ────────────────
 
 exports.sendTestNotification = onCall(
-  { secrets: [GMAIL_APP_PASSWORD] },
+  { secrets: [SENDGRID_API_KEY] },
   async () => {
     const db = getFirestore()
     const { recipientEmail, senderEmail, plants, log } = await loadData(db)
 
     const duePlants = plants.filter(p => isDue(p, log)).sort((a, b) => a.number - b.number)
     const { subject, html } = buildEmail(duePlants, log, { isTest: true })
-    await sendEmail(senderEmail, recipientEmail, subject, html, GMAIL_APP_PASSWORD.value())
+    await sendEmail(senderEmail, recipientEmail, subject, html, SENDGRID_API_KEY.value())
     return { sent: true, plantCount: duePlants.length }
   }
 )

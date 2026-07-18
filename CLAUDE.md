@@ -19,6 +19,8 @@ A digital plant care guide web app built so Brock's housemate can care for ~28 h
 | Hosting | GitHub Pages | Free, auto-deploys on push |
 | CI/CD | GitHub Actions | Builds + deploys on every push to `main` |
 | Styling | Vanilla CSS (no UI library) | Full control, no dependency overhead |
+| Email | SendGrid (@sendgrid/mail) | Transactional email via Cloud Functions; single sender verified at brock.gonzales@gmail.com |
+| Functions | Firebase Cloud Functions v2 | Scheduled daily notification + on-demand test email |
 
 ---
 
@@ -28,10 +30,15 @@ A digital plant care guide web app built so Brock's housemate can care for ~28 h
 Plants/                              ← git repo root
 ├── CLAUDE.md                        ← this file
 ├── plant_care_guide.md              ← plant-by-plant care reference (non-app doc)
+├── firebase.json                    ← Firebase project config (functions source + Node 22 runtime)
+├── .firebaserc                      ← Firebase project alias (brocks-plant-guide)
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml               ← GitHub Actions CI/CD (MUST be at repo root, not in plant-guide/)
 ├── .gitignore
+├── functions/                       ← Firebase Cloud Functions
+│   ├── index.js                     ← dailyWateringNotification + sendTestNotification
+│   └── package.json                 ← @sendgrid/mail, firebase-admin, firebase-functions
 └── plant-guide/                     ← Vite app source
     ├── public/
     │   └── images/                  ← plant photos: plant-1.jpg through plant-29.jpg
@@ -50,7 +57,8 @@ Plants/                              ← git repo root
     │   ├── hooks/
     │   │   ├── usePlants.js         ← Firestore `plants` collection CRUD + real-time sync
     │   │   ├── useWateringLog.js    ← `wateringLog` collection: log, status, history editing
-    │   │   └── useTrip.js           ← `trips` collection: set/clear trip dates + housemate note
+    │   │   ├── useTrip.js           ← `trips` collection: set/clear trip dates + housemate note
+    │   │   └── useSettings.js       ← `settings/notifications` doc: email toggle + addresses
     │   └── data/
     │       └── initialPlants.js     ← seed data (run once), WATERING_METHODS map
     ├── vite.config.js               ← base: '/plant-guide/' — must match GitHub repo name
@@ -219,3 +227,54 @@ Requires a `.env.local` file in `plant-guide/` with the 7 Firebase + PIN variabl
 - Confirmed that Phase 4 changes were live but not visible in regular browser due to GitHub Pages CDN cache
 - Fix: incognito window showed new version correctly; regular window needed "Empty Cache and Hard Reload" in DevTools
 - Created this CLAUDE.md file
+
+---
+
+### Session 4 — Email notifications + PlantDetail next water date (2026-07-02)
+
+**Phase 1 — PlantDetail next water date:**
+- Added "Next water: [date]" below "Last watered" in the PlantDetail modal, in bold magenta
+- Added `nextWaterDate` prop to PlantDetail; wired in App.jsx via `getNextWaterDate(selectedPlant)`
+- Added `.modal__next-water` CSS style
+
+**Phase 2 — Email notification system (Firebase Cloud Functions):**
+- Added `functions/` directory at repo root with `index.js` and `package.json`
+- Installed Firebase CLI via Homebrew (`brew install firebase-cli`)
+- Initialized Firebase project (`brocks-plant-guide`) with `.firebaserc` and `firebase.json`
+- Upgraded Firebase Functions to Node 22 runtime in both `functions/package.json` and `firebase.json`
+- Implemented two Cloud Functions:
+  - `dailyWateringNotification`: scheduled `onSchedule` at `0 8 * * *` America/Los_Angeles, checks `enabled` flag in Firestore, skips if no plants due
+  - `sendTestNotification`: `onCall` function triggered from Admin Panel, always sends (even if no plants due), includes test banner in email
+- Added `useSettings.js` hook — reads/writes `settings/notifications` Firestore document (`{ enabled, recipientEmail, senderEmail }`)
+- Updated `firebase.js` to export `fns` via `getFunctions`
+- Added Notifications section to Admin Panel:
+  - "ACTIVE" green badge when notifications are enabled
+  - Checkbox toggle, recipient email, sender email fields
+  - Save button with inline "✓ Saved" confirmation (3-second flash)
+  - "Send Test Email" button with inline success/failure feedback
+- Email HTML template: green header, plant table with name + instructions + last watered, link to app
+
+**Phase 3 — Email provider switch (Gmail SMTP → SendGrid):**
+- Original approach used nodemailer + Gmail App Password — persistently returned `535-5.7.8 Username and Password not accepted` despite correct 2-Step Verification setup; suspected Google blocking SMTP from Cloud Functions IP range
+- Switched to SendGrid:
+  - Brock signed up at sendgrid.com (free, 100 emails/day)
+  - Single Sender Verification for `brock.gonzales@gmail.com` (no domain required)
+  - API key stored as Firebase secret `SENDGRID_API_KEY`
+  - Replaced `nodemailer` with `@sendgrid/mail` in `functions/package.json` and `functions/index.js`
+- First successful test email sent to `colleenk.mills@yahoo.com`
+
+**Files changed this session:**
+- `functions/index.js` — new: Cloud Functions with SendGrid email, shared helpers (isDue, buildEmail, loadData, sendEmail)
+- `functions/package.json` — new: `@sendgrid/mail` dependency, Node 22 engine
+- `firebase.json` — new: functions source + Node 22 runtime
+- `.firebaserc` — new: default project `brocks-plant-guide`
+- `plant-guide/src/firebase.js` — added `getFunctions` export (`fns`)
+- `plant-guide/src/hooks/useSettings.js` — new: reads/writes `settings/notifications` Firestore doc
+- `plant-guide/src/App.jsx` — added `useSettings`, wired `notifSettings`/`saveNotifSettings` to AdminPanel, added `nextWaterDate` to PlantDetail
+- `plant-guide/src/components/PlantDetail.jsx` — added next water date display in bold magenta
+- `plant-guide/src/components/AdminPanel.jsx` — added Notifications section with toggle, email fields, save confirmation, test email button
+- `plant-guide/src/index.css` — added `.modal__next-water`, `.badge--active`, `.admin-section__title-row`, `.notif-save-row`, `.notif-saved-msg`
+
+**Firebase secrets (Secret Manager):**
+- `SENDGRID_API_KEY` — SendGrid API key for email sending
+- `GMAIL_APP_PASSWORD` — deprecated, no longer used (kept in Secret Manager but not referenced)
