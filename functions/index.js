@@ -4,10 +4,14 @@ const { defineSecret } = require('firebase-functions/params')
 const { initializeApp } = require('firebase-admin/app')
 const { getFirestore, Timestamp } = require('firebase-admin/firestore')
 const sgMail = require('@sendgrid/mail')
+const twilio = require('twilio')
 
 initializeApp()
 
 const SENDGRID_API_KEY = defineSecret('SENDGRID_API_KEY')
+const TWILIO_ACCOUNT_SID = defineSecret('TWILIO_ACCOUNT_SID')
+const TWILIO_AUTH_TOKEN = defineSecret('TWILIO_AUTH_TOKEN')
+const TWILIO_PHONE_NUMBER = defineSecret('TWILIO_PHONE_NUMBER')
 
 // ── Shared helpers ────────────────────────────────────────────────
 
@@ -115,6 +119,25 @@ function buildEmail(duePlants, log, { isTest } = {}) {
   return { subject, html }
 }
 
+function buildText(duePlants, { isTest } = {}) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  if (duePlants.length === 0) {
+    return `🧪 Test — Brock's Plant Guide: no plants are due today. This is what a real text will look like when plants need water.`
+  }
+
+  const plantLines = duePlants
+    .map(p => `#${p.number} ${p.name} — ${p.simpleInstruction}`)
+    .join('\n')
+
+  const prefix = isTest ? '🧪 Test — ' : ''
+  const countLabel = duePlants.length === 1 ? '1 plant needs' : `${duePlants.length} plants need`
+
+  return `${prefix}🌿 ${countLabel} water today (${dateStr}):\n${plantLines}`
+}
+
 async function isTripActive(db) {
   const tripDoc = await db.collection('config').doc('currentTrip').get()
   if (!tripDoc.exists) return false
@@ -134,8 +157,13 @@ async function isTripActive(db) {
 async function loadData(db) {
   const settingsDoc = await db.collection('settings').doc('notifications').get()
   if (!settingsDoc.exists) throw new Error('Notifications not configured')
-  const { enabled, recipientEmail, senderEmail } = settingsDoc.data()
-  if (!recipientEmail || !senderEmail) throw new Error('Email addresses not set')
+  const { enabled, recipientEmail, senderEmail, recipientPhone, channel = 'email' } = settingsDoc.data()
+  if ((channel === 'email' || channel === 'both') && (!recipientEmail || !senderEmail)) {
+    throw new Error('Email addresses not set')
+  }
+  if ((channel === 'text' || channel === 'both') && !recipientPhone) {
+    throw new Error('Recipient phone number not set')
+  }
 
   const plantsSnap = await db.collection('plants').where('isActive', '==', true).get()
   const plants = plantsSnap.docs.map(d => ({ ...d.data(), id: d.id }))
@@ -149,7 +177,7 @@ async function loadData(db) {
     .get()
   const log = logSnap.docs.map(d => ({ ...d.data(), id: d.id }))
 
-  return { enabled, recipientEmail, senderEmail, plants, log }
+  return { enabled, recipientEmail, senderEmail, recipientPhone, channel, plants, log }
 }
 
 async function sendEmail(senderEmail, recipientEmail, subject, html, apiKey) {
@@ -162,13 +190,35 @@ async function sendEmail(senderEmail, recipientEmail, subject, html, apiKey) {
   })
 }
 
+async function sendText(recipientPhone, body, accountSid, authToken, fromPhone) {
+  const client = twilio(accountSid, authToken)
+  await client.messages.create({
+    to: recipientPhone,
+    from: fromPhone,
+    body,
+  })
+}
+
+async function sendViaChannel(channel, { recipientEmail, senderEmail, recipientPhone, duePlants, log, isTest, secrets }) {
+  if (channel === 'email' || channel === 'both') {
+    const { subject, html } = buildEmail(duePlants, log, { isTest })
+    await sendEmail(senderEmail, recipientEmail, subject, html, secrets.sendgridKey)
+  }
+  if (channel === 'text' || channel === 'both') {
+    const body = buildText(duePlants, { isTest })
+    await sendText(recipientPhone, body, secrets.twilioSid, secrets.twilioToken, secrets.twilioPhone)
+  }
+}
+
 // ── Scheduled daily notification ──────────────────────────────────
+
+const NOTIFICATION_SECRETS = [SENDGRID_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]
 
 exports.dailyWateringNotification = onSchedule(
   {
     schedule: '0 8 * * *',
     timeZone: 'America/Los_Angeles',
-    secrets: [SENDGRID_API_KEY],
+    secrets: NOTIFICATION_SECRETS,
   },
   async () => {
     const db = getFirestore()
@@ -179,29 +229,43 @@ exports.dailyWateringNotification = onSchedule(
       return
     }
 
-    const { enabled, recipientEmail, senderEmail, plants, log } = await loadData(db)
+    const { enabled, recipientEmail, senderEmail, recipientPhone, channel, plants, log } = await loadData(db)
     if (!enabled) return
 
     const duePlants = plants.filter(p => isDue(p, log)).sort((a, b) => a.number - b.number)
     if (!duePlants.length) return
 
-    const { subject, html } = buildEmail(duePlants, log)
-    await sendEmail(senderEmail, recipientEmail, subject, html, SENDGRID_API_KEY.value())
-    console.log(`Sent to ${recipientEmail} for ${duePlants.length} plants`)
+    await sendViaChannel(channel, {
+      recipientEmail, senderEmail, recipientPhone, duePlants, log,
+      secrets: {
+        sendgridKey: SENDGRID_API_KEY.value(),
+        twilioSid: TWILIO_ACCOUNT_SID.value(),
+        twilioToken: TWILIO_AUTH_TOKEN.value(),
+        twilioPhone: TWILIO_PHONE_NUMBER.value(),
+      },
+    })
+    console.log(`Sent via ${channel} for ${duePlants.length} plants`)
   }
 )
 
-// ── On-demand test email (called from Admin Panel) ────────────────
+// ── On-demand test notification (called from Admin Panel) ─────────
 
 exports.sendTestNotification = onCall(
-  { secrets: [SENDGRID_API_KEY] },
+  { secrets: NOTIFICATION_SECRETS },
   async () => {
     const db = getFirestore()
-    const { recipientEmail, senderEmail, plants, log } = await loadData(db)
+    const { recipientEmail, senderEmail, recipientPhone, channel, plants, log } = await loadData(db)
 
     const duePlants = plants.filter(p => isDue(p, log)).sort((a, b) => a.number - b.number)
-    const { subject, html } = buildEmail(duePlants, log, { isTest: true })
-    await sendEmail(senderEmail, recipientEmail, subject, html, SENDGRID_API_KEY.value())
+    await sendViaChannel(channel, {
+      recipientEmail, senderEmail, recipientPhone, duePlants, log, isTest: true,
+      secrets: {
+        sendgridKey: SENDGRID_API_KEY.value(),
+        twilioSid: TWILIO_ACCOUNT_SID.value(),
+        twilioToken: TWILIO_AUTH_TOKEN.value(),
+        twilioPhone: TWILIO_PHONE_NUMBER.value(),
+      },
+    })
     return { sent: true, plantCount: duePlants.length }
   }
 )

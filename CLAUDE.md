@@ -20,7 +20,8 @@ A digital plant care guide web app built so Brock's housemate can care for ~28 h
 | CI/CD | GitHub Actions | Builds + deploys on every push to `main` |
 | Styling | Vanilla CSS (no UI library) | Full control, no dependency overhead |
 | Email | SendGrid (@sendgrid/mail) | Transactional email via Cloud Functions; single sender verified at brock.gonzales@gmail.com |
-| Functions | Firebase Cloud Functions v2 | Scheduled daily notification + on-demand test email |
+| Text | Twilio | SMS notifications via Cloud Functions; channel toggle (email/text/both) set in Admin Panel |
+| Functions | Firebase Cloud Functions v2 | Scheduled daily notification (trip-gated, only for plants due that day) + on-demand test notification |
 
 ---
 
@@ -277,6 +278,7 @@ Requires a `.env.local` file in `plant-guide/` with the 7 Firebase + PIN variabl
 
 **Firebase secrets (Secret Manager):**
 - `SENDGRID_API_KEY` — SendGrid API key for email sending
+- `GMAIL_APP_PASSWORD` — deprecated, no longer used (kept in Secret Manager but not referenced)
 
 ---
 
@@ -296,4 +298,32 @@ Requires a `.env.local` file in `plant-guide/` with the 7 Firebase + PIN variabl
 - `functions/index.js` — added `isTripActive`, wired into `dailyWateringNotification`
 - `plant-guide/src/App.jsx` — passes `tripStatus` to `AdminPanel`
 - `plant-guide/src/components/AdminPanel.jsx` — trip-aware Notifications copy and Active badge logic
-- `GMAIL_APP_PASSWORD` — deprecated, no longer used (kept in Secret Manager but not referenced)
+
+---
+
+### Session 6 — Text message notifications via Twilio (2026-09-08)
+
+**Requests:**
+1. Support text message notifications, not just email.
+2. Only notify (email or text) on days when at least one plant is actually due — no notification at all otherwise.
+3. A notification should list only the specific plant(s) due that day, not all plants.
+
+**#2 and #3 were already correct** — `dailyWateringNotification` already computed `duePlants` for that day and returned early with no send when `duePlants.length === 0`, and `buildEmail` only ever rendered that due-plants list. No changes needed for those two.
+
+**#1 — added Twilio SMS as a channel:**
+- `functions/index.js`:
+  - Added `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` secrets and the `twilio` npm package.
+  - Added `buildText(duePlants, { isTest })` — plain-text version of the reminder (plant number, name, simple instruction per line).
+  - Added `sendText()` (Twilio REST call) and `sendViaChannel()`, which sends email, text, or both based on `settings/notifications.channel`.
+  - `loadData()` now also reads `channel` (`'email' | 'text' | 'both'`, defaults to `'email'`) and `recipientPhone`, and validates only the fields the selected channel actually needs.
+  - Both `dailyWateringNotification` and `sendTestNotification` now call `sendViaChannel()` instead of calling SendGrid directly.
+- `plant-guide/src/hooks/useSettings.js` — `DEFAULT_SETTINGS` now includes `channel: 'email'` and `recipientPhone: ''`; existing settings docs are merged with defaults on load so older docs without these fields don't break.
+- `plant-guide/src/components/AdminPanel.jsx` — Notifications section now has a "Notify by" select (Email only / Text only / Email and text); email fields only show for email/both, a phone field (with country code, e.g. `+12065551234`) only shows for text/both. "Send Test Email" renamed to "Send Test Notification" since it now respects the channel setting.
+
+**Deploy status:** frontend and function code committed; **`firebase deploy --only functions` was not run yet** — it will fail until `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_PHONE_NUMBER` exist in Firebase Secret Manager, since Cloud Functions v2 requires declared secrets to exist at deploy time even if unused at runtime. Brock needs to sign up at twilio.com, get the Account SID + Auth Token from the console, and buy/verify a phone number, then either run `firebase functions:secrets:set <NAME>` for each or hand the three values over to set them. Cole's actual phone number is not a secret — it's entered in Admin Panel → Notifications → Notify phone, stored in the `settings/notifications` Firestore doc.
+
+**Files changed this session:**
+- `functions/index.js` — Twilio secrets, `buildText`, `sendText`, `sendViaChannel`, channel-aware `loadData`
+- `functions/package.json` / `functions/package-lock.json` — added `twilio` dependency
+- `plant-guide/src/hooks/useSettings.js` — `channel`/`recipientPhone` defaults, merge-on-load
+- `plant-guide/src/components/AdminPanel.jsx` — channel selector, phone field, generalized copy

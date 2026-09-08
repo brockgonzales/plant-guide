@@ -166,9 +166,9 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
     try {
       const fn = httpsCallable(fns, 'sendTestNotification')
       await fn()
-      setTestMsg('Test email sent!')
+      setTestMsg('Test sent!')
     } catch {
-      setTestMsg('Failed to send — check email settings and try again.')
+      setTestMsg('Failed to send — check notification settings and try again.')
     }
     setTestSending(false)
     setTimeout(() => setTestMsg(''), 5000)
@@ -265,33 +265,60 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                       Send daily watering reminders during trips
                     </label>
                     <span className="form-hint">
-                      When enabled, an email goes out each morning at 8 am (Pacific) listing plants that need water — but only on days that fall within a set trip's dates. No trip set means no emails, so there's nothing to remember to turn off when you get home.
+                      When enabled, a reminder goes out each morning at 8 am (Pacific) listing only the plants that need water that day — nothing is sent on days when nothing's due. Reminders only go out on days that fall within a set trip's dates; no trip set means nothing sends, so there's nothing to remember to turn off when you get home.
                       {tripStatus?.phase === 'active' && ' A trip is active right now, so this is currently live.'}
                       {tripStatus?.phase === 'upcoming' && ` No trip is active yet — this will start sending on day 1 of the upcoming trip (in ${tripStatus.daysUntil} day${tripStatus.daysUntil === 1 ? '' : 's'}).`}
                       {tripStatus?.phase === 'returned' && ' The set trip has ended, so this has stopped sending.'}
-                      {!tripStatus && ' No trip is currently set, so no emails will send.'}
+                      {!tripStatus && ' No trip is currently set, so nothing will send.'}
                     </span>
                     {notifForm.enabled && (
                       <div className="form-grid" style={{ marginTop: 12 }}>
-                        <label className="form-label form-label--full">Notify email
-                          <input
+                        <label className="form-label form-label--full">Notify by
+                          <select
                             className="input"
-                            type="email"
-                            value={notifForm.recipientEmail}
-                            onChange={e => setNotifForm(f => ({ ...f, recipientEmail: e.target.value }))}
-                            placeholder="mills.colleenk@gmail.com"
-                          />
+                            value={notifForm.channel || 'email'}
+                            onChange={e => setNotifForm(f => ({ ...f, channel: e.target.value }))}
+                          >
+                            <option value="email">Email only</option>
+                            <option value="text">Text only</option>
+                            <option value="both">Email and text</option>
+                          </select>
                         </label>
-                        <label className="form-label form-label--full">Send from (your Gmail)
-                          <input
-                            className="input"
-                            type="email"
-                            value={notifForm.senderEmail}
-                            onChange={e => setNotifForm(f => ({ ...f, senderEmail: e.target.value }))}
-                            placeholder="brock.gonzales@gmail.com"
-                          />
-                          <span className="form-hint">Must be the Gmail account whose App Password was configured.</span>
-                        </label>
+                        {(notifForm.channel === 'email' || notifForm.channel === 'both' || !notifForm.channel) && (
+                          <>
+                            <label className="form-label form-label--full">Notify email
+                              <input
+                                className="input"
+                                type="email"
+                                value={notifForm.recipientEmail}
+                                onChange={e => setNotifForm(f => ({ ...f, recipientEmail: e.target.value }))}
+                                placeholder="mills.colleenk@gmail.com"
+                              />
+                            </label>
+                            <label className="form-label form-label--full">Send from
+                              <input
+                                className="input"
+                                type="email"
+                                value={notifForm.senderEmail}
+                                onChange={e => setNotifForm(f => ({ ...f, senderEmail: e.target.value }))}
+                                placeholder="brock.gonzales@gmail.com"
+                              />
+                              <span className="form-hint">Must be the SendGrid verified sender address.</span>
+                            </label>
+                          </>
+                        )}
+                        {(notifForm.channel === 'text' || notifForm.channel === 'both') && (
+                          <label className="form-label form-label--full">Notify phone
+                            <input
+                              className="input"
+                              type="tel"
+                              value={notifForm.recipientPhone}
+                              onChange={e => setNotifForm(f => ({ ...f, recipientPhone: e.target.value }))}
+                              placeholder="+12065551234"
+                            />
+                            <span className="form-hint">Full number with country code, e.g. +1 for US.</span>
+                          </label>
+                        )}
                       </div>
                     )}
                     <div className="notif-save-row">
@@ -302,7 +329,7 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                     </div>
                     <div className="notif-save-row" style={{ marginTop: 8 }}>
                       <button className="btn btn--sm" onClick={sendTestEmail} disabled={testSending}>
-                        {testSending ? 'Sending…' : 'Send Test Email'}
+                        {testSending ? 'Sending…' : 'Send Test Notification'}
                       </button>
                       {testMsg && <span className="notif-saved-msg">{testMsg}</span>}
                     </div>

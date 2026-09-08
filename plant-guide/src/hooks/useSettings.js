@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 
-const DEFAULT_SETTINGS = { enabled: false, recipientEmail: '', senderEmail: '' }
+const DEFAULT_SETTINGS = { enabled: false, channel: 'email', recipientEmail: '', senderEmail: '', recipientPhone: '' }
 
 export function useSettings() {
   const [notifSettings, setNotifSettings] = useState(null)
@@ -10,7 +10,7 @@ export function useSettings() {
   useEffect(() => {
     if (!db) return
     getDoc(doc(db, 'settings', 'notifications')).then(snap => {
-      setNotifSettings(snap.exists() ? snap.data() : DEFAULT_SETTINGS)
+      setNotifSettings(snap.exists() ? { ...DEFAULT_SETTINGS, ...snap.data() } : DEFAULT_SETTINGS)
     })
   }, [])
 
