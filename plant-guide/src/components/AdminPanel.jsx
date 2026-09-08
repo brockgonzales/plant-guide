@@ -23,7 +23,7 @@ const BLANK_PLANT = {
   nextWaterDate: null,
 }
 
-export default function AdminPanel({ plants, trip, addPlant, updatePlant, deactivatePlant, reactivatePlant, setTrip, clearTrip, onClose, isAuthed, onAdminAuth, directEditPlant, log = [], logWateringOnDate, updateWateringEntry, deleteWateringEntry, notifSettings, saveNotifSettings }) {
+export default function AdminPanel({ plants, trip, tripStatus, addPlant, updatePlant, deactivatePlant, reactivatePlant, setTrip, clearTrip, onClose, isAuthed, onAdminAuth, directEditPlant, log = [], logWateringOnDate, updateWateringEntry, deleteWateringEntry, notifSettings, saveNotifSettings }) {
   const [pin, setPin] = useState('')
   const [authed, setAuthed] = useState(() => isAuthed ?? false)
   const [pinError, setPinError] = useState(false)
@@ -250,7 +250,7 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
               <div className="admin-section">
                 <h3 className="admin-section__title-row">
                   Notifications
-                  {notifForm?.enabled && <span className="badge badge--active">Active</span>}
+                  {notifForm?.enabled && tripStatus?.phase === 'active' && <span className="badge badge--active">Active</span>}
                 </h3>
                 {!notifForm ? (
                   <p className="text-muted">Loading…</p>
@@ -262,9 +262,15 @@ export default function AdminPanel({ plants, trip, addPlant, updatePlant, deacti
                         checked={notifForm.enabled}
                         onChange={e => setNotifForm(f => ({ ...f, enabled: e.target.checked }))}
                       />
-                      Send daily watering reminders
+                      Send daily watering reminders during trips
                     </label>
-                    <span className="form-hint">When enabled, an email is sent each morning at 8 am (Pacific) listing plants that need water. Turn on before you travel, off when you return.</span>
+                    <span className="form-hint">
+                      When enabled, an email goes out each morning at 8 am (Pacific) listing plants that need water — but only on days that fall within a set trip's dates. No trip set means no emails, so there's nothing to remember to turn off when you get home.
+                      {tripStatus?.phase === 'active' && ' A trip is active right now, so this is currently live.'}
+                      {tripStatus?.phase === 'upcoming' && ` No trip is active yet — this will start sending on day 1 of the upcoming trip (in ${tripStatus.daysUntil} day${tripStatus.daysUntil === 1 ? '' : 's'}).`}
+                      {tripStatus?.phase === 'returned' && ' The set trip has ended, so this has stopped sending.'}
+                      {!tripStatus && ' No trip is currently set, so no emails will send.'}
+                    </span>
                     {notifForm.enabled && (
                       <div className="form-grid" style={{ marginTop: 12 }}>
                         <label className="form-label form-label--full">Notify email

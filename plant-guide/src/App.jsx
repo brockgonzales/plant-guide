@@ -133,6 +133,7 @@ export default function App() {
         <AdminPanel
           plants={plants}
           trip={trip}
+          tripStatus={tripStatus}
           addPlant={addPlant}
           updatePlant={updatePlant}
           deactivatePlant={deactivatePlant}

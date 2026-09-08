@@ -277,4 +277,23 @@ Requires a `.env.local` file in `plant-guide/` with the 7 Firebase + PIN variabl
 
 **Firebase secrets (Secret Manager):**
 - `SENDGRID_API_KEY` — SendGrid API key for email sending
+
+---
+
+### Session 5 — Gate notifications on trip dates (2026-09-08)
+
+**Bug reported:** after Brock returned from India, Cole kept receiving daily watering emails even though Brock was home and watering the plants himself. Root cause: the `enabled` toggle in Admin Panel → Notifications was a manual on/off switch with no relationship to the trip banner/dates — nothing auto-stopped it when a trip ended.
+
+**Fix — scheduled email now requires an active trip:**
+- `functions/index.js` — added `isTripActive(db)`, which reads `config/currentTrip` and checks whether today falls within `[startDate, endDate]` (inclusive, same day-zeroing pattern as `isDue`). `dailyWateringNotification` now returns early (no email) if there's no trip or today is outside its window, before even checking the `enabled` flag. `sendTestNotification` is unchanged — the admin test-email button still fires regardless of trip status, since it's a manual preview action.
+- The `enabled` checkbox remains as a master switch (e.g. to suppress emails during a trip if Cole isn't covering that one), but going forward the trip's start/end dates set via Admin Panel → Set Trip are what actually start and stop the daily emails — nothing to remember to toggle off after returning.
+- `plant-guide/src/components/AdminPanel.jsx` — Notifications section now shows trip-aware status copy (active trip / upcoming trip with days-until / trip ended / no trip set); "Active" badge now requires both `enabled` AND an active trip.
+- `plant-guide/src/App.jsx` — passes `tripStatus` (from `useTrip().getTripStatus()`) into `AdminPanel`.
+
+**For the October trip:** set the trip's start/end dates via Admin Panel → Set Trip as usual; as long as "Send daily watering reminders during trips" stays checked, Cole's emails will start on day 1 and stop automatically the day after the trip ends — no manual toggle needed.
+
+**Files changed this session:**
+- `functions/index.js` — added `isTripActive`, wired into `dailyWateringNotification`
+- `plant-guide/src/App.jsx` — passes `tripStatus` to `AdminPanel`
+- `plant-guide/src/components/AdminPanel.jsx` — trip-aware Notifications copy and Active badge logic
 - `GMAIL_APP_PASSWORD` — deprecated, no longer used (kept in Secret Manager but not referenced)

@@ -115,6 +115,22 @@ function buildEmail(duePlants, log, { isTest } = {}) {
   return { subject, html }
 }
 
+async function isTripActive(db) {
+  const tripDoc = await db.collection('config').doc('currentTrip').get()
+  if (!tripDoc.exists) return false
+  const { startDate, endDate } = tripDoc.data()
+  if (!startDate || !endDate) return false
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = startDate.toDate()
+  start.setHours(0, 0, 0, 0)
+  const end = endDate.toDate()
+  end.setHours(0, 0, 0, 0)
+
+  return today >= start && today <= end
+}
+
 async function loadData(db) {
   const settingsDoc = await db.collection('settings').doc('notifications').get()
   if (!settingsDoc.exists) throw new Error('Notifications not configured')
@@ -156,6 +172,13 @@ exports.dailyWateringNotification = onSchedule(
   },
   async () => {
     const db = getFirestore()
+
+    const tripActive = await isTripActive(db)
+    if (!tripActive) {
+      console.log('No active trip today — skipping notification')
+      return
+    }
+
     const { enabled, recipientEmail, senderEmail, plants, log } = await loadData(db)
     if (!enabled) return
 
