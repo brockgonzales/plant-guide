@@ -45,6 +45,8 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
   })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [bulkForm, setBulkForm] = useState({})
+  const [bulkSaving, setBulkSaving] = useState(false)
   const [notifForm, setNotifForm] = useState(null)
   const [notifSaved, setNotifSaved] = useState(false)
   const [testSending, setTestSending] = useState(false)
@@ -75,6 +77,50 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
     setPlantForm({ ...BLANK_PLANT, number: maxNum + 1 })
     setWarningInput('')
     setView('add-plant')
+  }
+
+  function startBulkEdit() {
+    const form = {}
+    for (const p of plants.filter(p => p.isActive)) {
+      form[p.id] = {
+        location: p.location,
+        wateringIntervalDays: p.wateringIntervalDays,
+        wateringIntervalMaxDays: p.wateringIntervalMaxDays,
+        wateringMethod: p.wateringMethod,
+      }
+    }
+    setBulkForm(form)
+    setView('bulk-edit')
+  }
+
+  function bfChange(id, field, val) {
+    setBulkForm(f => ({ ...f, [id]: { ...f[id], [field]: val } }))
+  }
+
+  async function saveBulkEdits() {
+    setBulkSaving(true)
+    const changed = plants.filter(p => {
+      const f = bulkForm[p.id]
+      if (!f) return false
+      return (
+        f.location !== p.location ||
+        parseInt(f.wateringIntervalDays) !== p.wateringIntervalDays ||
+        parseInt(f.wateringIntervalMaxDays) !== p.wateringIntervalMaxDays ||
+        f.wateringMethod !== p.wateringMethod
+      )
+    })
+    await Promise.all(changed.map(p => {
+      const f = bulkForm[p.id]
+      return updatePlant(p.id, {
+        location: f.location,
+        wateringIntervalDays: parseInt(f.wateringIntervalDays),
+        wateringIntervalMaxDays: parseInt(f.wateringIntervalMaxDays),
+        wateringMethod: f.wateringMethod,
+      })
+    }))
+    setBulkSaving(false)
+    flash(`${changed.length} plant${changed.length === 1 ? '' : 's'} updated!`)
+    setView('home')
   }
 
   function pfChange(field, val) {
@@ -230,7 +276,10 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
 
               <div className="admin-section">
                 <h3>Plants</h3>
-                <button className="btn btn--primary" onClick={startAdd}>+ Add New Plant</button>
+                <div className="admin-row">
+                  <button className="btn btn--primary" onClick={startAdd}>+ Add New Plant</button>
+                  <button className="btn" onClick={startBulkEdit}>Bulk Edit Location/Watering</button>
+                </div>
                 <div className="admin-plant-list">
                   {plants.map(p => (
                     <div key={p.id} className={`admin-plant-row ${!p.isActive ? 'admin-plant-row--inactive' : ''}`}>
@@ -449,6 +498,55 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                   </div>
                 </div>
               )}
+            </>
+          )}
+
+          {view === 'bulk-edit' && (
+            <>
+              <button className="btn btn--back" onClick={() => setView('home')}>← Back</button>
+              <h2>Bulk Edit Location / Watering</h2>
+              <p className="text-muted">Quickly update where each plant lives and how often it needs water — handy after repotting or a seasonal watering change. Only rows you change are saved.</p>
+
+              <div className="bulk-edit-list">
+                {plants.filter(p => p.isActive).map(p => {
+                  const f = bulkForm[p.id]
+                  if (!f) return null
+                  return (
+                    <div key={p.id} className="bulk-edit-row">
+                      <div className="bulk-edit-row__header">
+                        {p.hasPhoto ? (
+                          <img className="bulk-edit-row__thumb" src={`/plant-guide/images/${p.photoPath}`} alt={p.name} loading="lazy" />
+                        ) : (
+                          <div className="bulk-edit-row__thumb bulk-edit-row__thumb--placeholder">🌿</div>
+                        )}
+                        <span className="admin-plant-row__name">#{p.number} {p.name}</span>
+                      </div>
+                      <div className="form-grid">
+                        <label className="form-label form-label--full">Location
+                          <input className="input" value={f.location} onChange={e => bfChange(p.id, 'location', e.target.value)} />
+                        </label>
+                        <label className="form-label">Water every (min days)
+                          <input className="input" type="number" value={f.wateringIntervalDays} onChange={e => bfChange(p.id, 'wateringIntervalDays', e.target.value)} />
+                        </label>
+                        <label className="form-label">Water every (max days)
+                          <input className="input" type="number" value={f.wateringIntervalMaxDays} onChange={e => bfChange(p.id, 'wateringIntervalMaxDays', e.target.value)} />
+                        </label>
+                        <label className="form-label form-label--full">Watering Method
+                          <select className="input" value={f.wateringMethod} onChange={e => bfChange(p.id, 'wateringMethod', e.target.value)}>
+                            {Object.entries(WATERING_METHODS).map(([k, v]) => (
+                              <option key={k} value={k}>{v}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button className="btn btn--primary btn--full" onClick={saveBulkEdits} disabled={bulkSaving}>
+                {bulkSaving ? 'Saving...' : 'Save All Changes'}
+              </button>
             </>
           )}
 

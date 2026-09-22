@@ -708,6 +708,13 @@ input, select, textarea { font: inherit; }
 .admin-plant-row--inactive { opacity: 0.5; }
 .admin-plant-row__name { font-weight: 600; }
 
+.bulk-edit-list { display: flex; flex-direction: column; gap: 16px; margin: 16px 0; }
+.bulk-edit-row { padding: 12px; background: var(--cream); border-radius: var(--radius-sm); }
+.bulk-edit-row .form-grid { margin-bottom: 0; }
+.bulk-edit-row__header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.bulk-edit-row__thumb { width: 36px; height: 36px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.bulk-edit-row__thumb--placeholder { display: flex; align-items: center; justify-content: center; background: var(--green-100); font-size: 18px; }
+
 .warning-input-row {
   display: flex;
   align-items: center;
