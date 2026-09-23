@@ -42,7 +42,9 @@ Plants/                              ← git repo root
 │   └── package.json                 ← @sendgrid/mail, firebase-admin, firebase-functions
 └── plant-guide/                     ← Vite app source
     ├── public/
-    │   └── images/                  ← plant photos: plant-1.jpg through plant-29.jpg
+    │   ├── images/                  ← plant photos: plant-1.jpg through plant-29.jpg
+    │   ├── privacy-policy.html      ← static page, required for Twilio A2P 10DLC campaign registration
+    │   └── terms.html               ← static page, required for Twilio A2P 10DLC campaign registration
     ├── src/
     │   ├── App.jsx                  ← root: state, tab routing, admin auth lift
     │   ├── main.jsx
@@ -327,3 +329,93 @@ Requires a `.env.local` file in `plant-guide/` with the 7 Firebase + PIN variabl
 - `functions/package.json` / `functions/package-lock.json` — added `twilio` dependency
 - `plant-guide/src/hooks/useSettings.js` — `channel`/`recipientPhone` defaults, merge-on-load
 - `plant-guide/src/components/AdminPanel.jsx` — channel selector, phone field, generalized copy
+
+---
+
+### Session 7 — Twilio A2P registration, bulk edit feature (built then reworked), India trip prep, plant photo ID (2026-09-22)
+
+**Context coming in:** Session 6 had written the Twilio SMS code but explicitly left `firebase deploy --only functions` un-run because the three Twilio secrets (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`) didn't exist yet in Firebase Secret Manager. Brock also flagged that the plants had all just been repotted and moved for an upcoming India trip (**10/1/26 – 10/15/26**, confirmed exact dates this session), with many needing seasonal (fall/winter) watering-frequency changes.
+
+**Phase 1 — Confirmed Twilio as the SMS provider:**
+- Brock had a vague memory of deciding on a "different solution" than Twilio; no evidence of that existed anywhere in git history or prior session logs. Brock then explicitly confirmed: *"ok. let's go with twilio. i have signed up and created a billing account for pay as you go."* Twilio remains the SMS provider — no code changes needed here since Session 6 already built the integration; this session focused on finishing account/compliance setup and deploying it.
+
+**Phase 2 — Twilio A2P 10DLC compliance walkthrough (interactive, via user screenshots):**
+Twilio requires A2P 10DLC registration before a long-code number can send SMS in the US. Walked through the full pipeline live:
+1. Twilio account + billing set up by Brock, phone number purchased.
+2. **Brand registration** — registered as **Sole Proprietor** (cheapest/fastest tier, sufficient for this low-volume private use case). Brand submitted → went to "In Review" → came back **Approved**.
+3. **Campaign registration** — use-case type was constrained to "Sole Proprietor" given the Brand type (no other options were offered). Went through multiple rejected quick-check attempts before passing:
+   - *Rejection 1:* Campaign Description was written as "personal texting between two people," which 10DLC review rejects — carriers require the message to be framed as coming from software/a platform, not a person. Rewrote it to describe the Cloud Function / app as the automated sender.
+   - *Rejection 2:* Sample messages were missing the brand name and opt-out language. Fixed by prefixing samples with "Plant Guide Notifications:" and appending "Reply STOP to opt out."
+   - *Rejection 3 (twice):* "Proof of consent" field. First attempt was a narrative explanation, which was rejected for not being a literal, quotable consent script. Second attempt was a quoted script but was still missing required disclosure elements. Final version is a quoted verbal script that includes: the brand name, message frequency, "Msg & data rates may apply," and STOP/HELP instructions.
+   - Along the way, the Twilio console also threw a one-off "unexpected error" on Campaign submission — this was a transient sync delay right after Brand approval; retrying ~1 minute later worked.
+4. **Required hosted Privacy Policy + Terms & Conditions URLs** — this requirement wasn't anticipated at the start (initially assumed the bare app root URL might be enough for this small a use case); once the actual Twilio form demanded specific content, built and deployed two dedicated static pages instead of a placeholder:
+   - `plant-guide/public/privacy-policy.html` (NEW) — title "Privacy Policy," names the brand "Plant Guide Notifications," states what's collected (plant data, recipient email/phone entered manually by Brock, not via public signup), how it's used (reminders only), and contains the Twilio-required exact phrase: *"We do not sell or share your SMS opt-in data or personal information with third parties for marketing purposes."* Includes STOP opt-out instructions and contact email `brock.gonzales@gmail.com`.
+   - `plant-guide/public/terms.html` (NEW) — title "Terms & Conditions," includes a dedicated "SMS Terms" section stating message frequency ("at most once per day"), the required "Message and data rates may apply" disclosure, STOP/HELP instructions, a no-warranty clause, and the same contact email.
+   - Both pages are plain static HTML dropped in `plant-guide/public/` — Vite copies `public/` as-is into `dist/`, so they deploy automatically via the existing GitHub Actions pipeline with no build config changes.
+   - Confirmed live after deploy (polled with `curl -o /dev/null -w "%{http_code}"` in a retry loop since the GitHub Pages CDN took ~4 polling attempts / ~60–80s to catch up): `https://brockgonzales.github.io/plant-guide/privacy-policy.html` and `.../terms.html` both returned HTTP 200.
+   - Campaign was resubmitted with these URLs and **passed the quick check**. **Status as of last check: "In Review" (pending carrier approval) — NOT yet confirmed approved.**
+
+**Phase 3 — Firebase secrets + function deployment:**
+- Gave Brock the step-by-step for `firebase functions:secrets:set <NAME>` for each of the three Twilio secrets. **Brock ran these commands himself in his own terminal** — at no point were the actual secret values (Account SID, Auth Token, phone number) typed into or stored in this chat session. This is a deliberate, maintained security boundary.
+- Brock lost his copy of the Auth Token after setting it and asked for it back — declined, since it was never available to this session to give back; redirected him to re-reveal it in the Twilio console instead. **This boundary should be maintained in all future sessions: never type, store, or relay raw secret values (API keys, tokens, passwords) through the chat, even if the user asks for a lost value back.**
+- Brock also initially entered `TWILIO_PHONE_NUMBER` in the wrong format, then corrected it — this created two secret versions in Secret Manager (v1 wrong, v2 correct), which needed no cleanup since Cloud Functions v2 always resolves to the latest version at deploy time.
+- Ran `firebase deploy --only functions` from the repo root — **succeeded**. Both `dailyWateringNotification(us-central1)` and `sendTestNotification(us-central1)` (Node.js 22, 2nd Gen) were updated and granted secret access to `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`.
+- **Net effect: the Twilio SMS code path is now live in production**, but actual SMS delivery is still gated on the A2P Campaign being approved (carrier-level review, not something either of us controls the timing of) and on Cole's phone number + a channel of `text` or `both` being set in Admin Panel → Notifications (not yet confirmed set).
+
+**Phase 4 — Bulk edit feature, v1 (built, then found to have real problems):**
+- Brock's ask: after repotting/relocating ~28 plants, editing each individually via the existing one-plant-at-a-time "Edit Plant" form would be far too slow before the trip. Asked whether one-by-one editing was sufficient; Brock said *"Yes, build bulk editing."*
+- Built v1: a new Admin Panel view listing every active plant as its own inline card (36px photo thumbnail, name, and four editable fields: Location, Water-every min/max days, Watering Method), with one "Save All Changes" button at the bottom that diffed every row against its original value and wrote only the changed ones.
+- Committed as `0404024` — "Add bulk edit for plant location and watering frequency" (`AdminPanel.jsx`, `index.css`).
+- **This version is now superseded (see Phase 6) — do not resurrect the old per-row inline-edit UI or the 36px thumbnail size.**
+
+**Phase 5 — Trip dates, HEIC handling, and plant photo identification (unresolved — needs Brock's confirmation):**
+- Brock gave exact India trip dates: **10/1/26 – 10/15/26**. Instructed him to enter these himself via Admin Panel → "Set Upcoming Trip" (Destination "India", those two dates, optional note for Cole) since this session has no browser access to do it directly. **Not yet confirmed done** — check Admin Panel → Trip section (or the `trips`/`config/currentTrip` Firestore doc) at the start of the next session.
+- Brock asked whether HEIC photos dragged from the Mac Photos app would work when pasted into chat. Confirmed yes — pasting/dragging into this chat auto-converts to JPG/PNG regardless of source format (all screenshots throughout this whole conversation, including the 8 plant photos below, landed as `.jpg`), so no manual conversion is needed for this workflow. (`sips` was offered as a manual fallback if raw `.heic` files ever need converting from disk directly, but wasn't needed.)
+- Brock then shared **8 photos of every plant in its new post-repotting location**, captioned: *"there are two new plants in there as well. can you figure out which ones."* I gave a photo-by-photo tentative read cross-referenced against the 28-plant roster in this file's "Plant Inventory" section, explicitly flagging low confidence given photo resolution and how visually similar several species are (e.g. the Ficus elastica 'Burgundy' vs. 'Tineke' rubber plants were indistinguishable in two different photos). Best guesses given:
+  - Confident matches: #19 Corn Plant, #15 Snake Plant, #11 Stromanthe Triostar, #17 Anthurium, #7 Zebra Plant, #21 Jade Plant, #24 Wandering Dude, #6 Ripple Peperomia, #29 Prince of Orange (via its characteristic orange new growth), #10 Black Rubber Plant (now on a plant stand), #1/#2 Raven ZZ.
+  - Uncertain: several Chinese Evergreen variants (#12/#13/#26/#27 look similar in photos), which rubber plant is #10 vs #20 Tineke in two different shots, and a small pink/green mottled plant that might be #3 Red Nerve Plant or might be new.
+  - **Two candidates flagged for "new plant not in inventory":** (1) a dark purple-leaved ornamental plant visible in one windowsill photo (no match in the current 28-plant roster), and (2) a spiky, grass-like plant in a white pot visible in one of the console photos (also no match).
+  - **This entire identification is unconfirmed.** Brock has not yet responded with corrections, the actual names/species of the two new plants, or confirmed new locations. **This must be resolved before running the bulk-location update** — do not write guessed locations into Firestore without Brock's sign-off.
+
+**Phase 6 — Bulk edit rework, v2 (the main deliverable of this session):**
+- Brock's feedback on v1, verbatim: *"the bulk edit function is good but its too small. i can't tell the plants by picture and i do not know them well enough by name. plus as i was editing them the page reset on its own before i could finish or save... lost half of the updates i was making. it would be good to let me bulk select the plants i want to update and let me update the fields once and have it propagate to all of the ones i checked."*
+- **Root-cause investigation for the "page reset on its own" data-loss bug:** Re-read `AdminPanel.jsx` and `App.jsx` in full. `bulkForm` (the v1 state) was a plain `useState` with nothing else writing to it — no effect keyed on the live Firestore `plants` snapshot, no remount-inducing `key` prop on `<AdminPanel>` in `App.jsx`. The one concrete mechanism found that would silently drop all in-progress admin state: the modal-overlay `onClick` handler — `onClick={e => e.target === e.currentTarget && onClose()}` — closed and **unmounted the entire `AdminPanel` component** (discarding every piece of local state, not just bulk-edit) whenever a click/tap landed on the semi-transparent backdrop outside the modal box itself. With a long scrolling list of ~28 plant rows (v1's UI), a stray tap or touch-scroll landing just outside the modal edge is very plausible, especially on a phone. This reads as the most likely explanation for the reported reset, though it was not reproduced live (no browser tool was available this session — see Phase 7).
+- **Redesigned bulk edit as an explicit two-step flow**, matching Brock's requested UX exactly (select the plants, set the fields once, propagate to all selected):
+  - **Step 1 — "select"**: every active plant shown as a checkbox row with a **72px photo** (up from 36px — matches the size already used on the Today tab's task cards, chosen specifically because it was the smallest size Brock had already found "readable" elsewhere in the app), `#number Name`, and the plant's **current location** as a subtitle for context. "Select All" / "Clear" buttons at the top, a running "N selected" count, and a sticky bottom bar with a "Continue →" button (disabled until at least one plant is checked).
+  - **Step 2 — "apply"**: one shared form with exactly four fields — Location (text), Water-every min days, Water-every max days, Watering Method (select) — plus a summary line listing exactly which plants (by `#number Name`) are about to be changed. **Any field left blank (or the method dropdown left on "— No change —") is not written** — this lets Brock, e.g., bulk-set only Location for one group of plants and only Watering Method for a different group, without one selection's blank fields ever overwriting real data with empty strings. Clicking "Apply to N plants" fires one `Promise.all` of `updatePlant(id, updates)` calls for every checked plant ID, then resets back to a fresh "select" step (so Brock can immediately start a second batch with different plants/values without re-opening the feature) and flashes a "N plants updated!" confirmation.
+  - This also structurally reduces the data-loss blast radius versus v1: the only state that can be lost to an interruption is one batch's field values (a few seconds of typing), never 28 rows of in-progress per-plant edits.
+- **Fixed the accidental-close bug for every admin sub-view, not just bulk-edit:** changed the overlay's `onClick` guard to `e.target === e.currentTarget && view === 'home' && onClose()`. Now a stray backdrop tap only closes the panel when sitting at the Admin home screen; while inside Add Plant, Edit Plant, Bulk Edit, or Set Trip, only the explicit ✕ button or a view's own "← Back" button will exit. **This is a general safety fix — apply the same pattern to any future admin sub-view added to this component.**
+- CSS: removed the old v1 rules (`.bulk-edit-list`, `.bulk-edit-row`, `.bulk-edit-row__*` at 36px) and added the v2 rules in `index.css`: `.bulk-toolbar`/`.bulk-toolbar__count`, `.bulk-select-list`, `.bulk-select-row` (+ `--checked` state), `.bulk-select-row__checkbox`/`__thumb`/`__thumb--placeholder`/`__info`/`__name`/`__location`, `.bulk-sticky-bar`, `.bulk-apply-summary`/`.bulk-apply-hint`.
+- Verified `npm run build` succeeds (no syntax/type errors) and that `npm run dev` serves the app (HTTP 200 on the local root). **Did not** interactively click through the new select → apply → confirm flow in an actual browser — no browser automation tool was available in this session (see Phase 7). Treat the UI as code-reviewed and build-verified but **not yet functionally verified**.
+- Committed as `022546e` — "Rework bulk edit into select-then-apply flow" (`AdminPanel.jsx`, `index.css`) — pushed to `origin/main`.
+
+**Phase 7 — Browser automation tooling (discussed, not yet installed):**
+- Brock asked what's needed to add a browser tool so future sessions can actually click through UI changes instead of only build-checking them. Delegated the lookup to the `claude-code-guide` subagent rather than answering from memory, since exact package names/command syntax matter and are easy to get subtly wrong.
+- Recommended path: **Playwright MCP** (Microsoft's official package). Install with:
+  ```
+  claude mcp add playwright -- npx -y @playwright/mcp@latest
+  ```
+  Default scope is local (this project only, this user only) — add `--scope project` to share via a committed `.mcp.json`, or `--scope user` for all projects. Verify with `claude mcp list` or the `/mcp` slash command (works identically in the VSCode extension). No session restart required; the first tool call triggers a one-time permission prompt. Requires Node 18+ (already satisfied) and a browser installed locally.
+- **Not yet installed** — Brock has not run the `claude mcp add` command as of end of session. **Once installed, the first thing to do with it should be a real interactive test of the Phase 6 bulk-edit-v2 flow** (select several plants, apply a location/watering change, confirm it lands correctly in Firestore, confirm the sticky bar and checkbox states behave, confirm the accidental-backdrop-click fix actually holds) before trusting it for the real pre-trip data entry.
+
+**Files changed this session (chronological):**
+- `plant-guide/src/components/AdminPanel.jsx` — v1 bulk edit added, then fully reworked to v2 (see Phase 4 & 6)
+- `plant-guide/src/index.css` — v1 bulk-edit styles added, then replaced with v2 styles
+- `plant-guide/public/privacy-policy.html` — new, for Twilio A2P
+- `plant-guide/public/terms.html` — new, for Twilio A2P
+- Firebase Secret Manager — `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` set (by Brock, values never seen by this session)
+- Firebase Cloud Functions — `dailyWateringNotification` and `sendTestNotification` redeployed with Twilio secret access
+
+**Git commits this session:**
+- `0404024` — Add bulk edit for plant location and watering frequency (v1, superseded)
+- `f8801d5` — Add privacy policy and terms pages for Twilio A2P registration
+- `022546e` — Rework bulk edit into select-then-apply flow (v2, current) — pushed to `origin/main`
+
+**Everything pending — pick up here next session, roughly in priority order:**
+1. **Check Twilio A2P Campaign status** (was "In Review" as of this session's last check). If approved, SMS is fully live end-to-end. If rejected, expect another round of quick-check-style fixes similar to Phase 2.
+2. **Confirm the India trip (10/1/26–10/15/26) has been entered** via Admin Panel → Set Trip (or check the `config/currentTrip` / `trips` Firestore doc directly) — given to Brock as a manual step, completion not verified.
+3. **Resolve the plant photo identification from Phase 5** — get Brock's corrections/confirmations on the tentative per-photo plant matches, get the actual name/species for the two candidate "new" plants (purple-leaved ornamental; spiky/grass-like plant in a white pot), and confirm each plant's new location.
+4. **Once #3 is resolved:** use the new bulk-edit v2 flow (Phase 6) to update locations for all relocated plants, and add the two brand-new plants via the existing "+ Add New Plant" flow (bulk edit intentionally only edits existing active plants — it has no add-new capability). Also still need actual per-plant fall/winter watering-frequency numbers from Brock — he flagged that many plants need less-frequent watering heading into hibernation season but hasn't given specific min/max day values yet.
+5. **Install Playwright MCP** (Phase 7 command above) and use it to functionally test the bulk-edit v2 flow in a real browser before relying on it for the pre-trip data entry — this has only been build-verified, not click-tested.
+6. If Brock wants the app's plant photos themselves refreshed to match the new pots/locations, the actual image files still need to be added to `plant-guide/public/images/` and committed — not started.
+7. No action needed, just a standing note: `GMAIL_APP_PASSWORD` remains an unused/deprecated secret sitting in Firebase Secret Manager (see Session 4) — harmless, just noise.
