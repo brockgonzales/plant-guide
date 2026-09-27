@@ -1,6 +1,5 @@
 import PlantCard from './PlantCard'
-
-const LOCATION_ORDER = ['Desk Window', 'Kitchen Window', 'Living Room Window', 'Stairwell Window']
+import { groupByLocation } from '../data/locations'
 
 export default function PlantGrid({ plants, getWateringStatus, getLastWatered, onPlantClick, showInactive }) {
   const visible = showInactive ? plants : plants.filter(p => p.isActive)
@@ -13,28 +12,16 @@ export default function PlantGrid({ plants, getWateringStatus, getLastWatered, o
     )
   }
 
-  const groups = new Map()
-  for (const plant of visible) {
-    const key = LOCATION_ORDER.includes(plant.location) ? plant.location : 'Other'
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(plant)
-  }
-
-  const orderedLocations = [
-    ...LOCATION_ORDER.filter(loc => groups.has(loc)),
-    ...(groups.has('Other') ? ['Other'] : []),
-  ]
-
   return (
-    <div className="plant-grid-sections">
-      {orderedLocations.map(location => (
-        <div key={location} className="plant-grid-section">
-          <h3 className="plant-grid-section__title">
+    <div className="location-sections">
+      {groupByLocation(visible).map(([location, group]) => (
+        <div key={location}>
+          <h3 className="location-section__title">
             {location}
-            <span className="badge badge--neutral">{groups.get(location).length}</span>
+            <span className="badge badge--neutral">{group.length}</span>
           </h3>
           <div className="plant-grid">
-            {groups.get(location).map(plant => (
+            {group.map(plant => (
               <PlantCard
                 key={plant.id}
                 plant={plant}

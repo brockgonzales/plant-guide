@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { WATERING_METHODS } from '../data/initialPlants'
+import { groupByLocation } from '../data/locations'
 
 export default function TodayTasks({ plants, isDueToday, wasWateredToday, logWatering, getLastWatered, getNextWaterDate, onPlantClick }) {
   const [confirming, setConfirming] = useState(null)
@@ -77,55 +78,65 @@ export default function TodayTasks({ plants, isDueToday, wasWateredToday, logWat
       </h2>
 
       {duePlants.length > 0 && (
-        <div className="task-list">
-          {duePlants.map(plant => (
-            <div key={plant.id} className="task-card task-card--due">
-              <div className="task-card__info" onClick={() => onPlantClick(plant)}>
-                <div className="task-card__header">
-                  {plant.hasPhoto ? (
-                    <img
-                      className="task-card__thumb"
-                      src={`/plant-guide/images/${plant.photoPath}`}
-                      alt={plant.name}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="task-card__thumb task-card__thumb--placeholder">🌿</div>
-                  )}
-                  <div className="task-card__header-text">
-                    <div className="task-card__name-row">
-                      <span className="task-card__num">#{plant.number}</span>
-                      <span className="task-card__name">{plant.name}</span>
+        <div className="location-sections">
+          {groupByLocation(duePlants).map(([location, group]) => (
+            <div key={location}>
+              <h3 className="location-section__title">
+                {location}
+                <span className="badge badge--due">{group.length} due</span>
+              </h3>
+              <div className="task-list">
+                {group.map(plant => (
+                  <div key={plant.id} className="task-card task-card--due">
+                    <div className="task-card__info" onClick={() => onPlantClick(plant)}>
+                      <div className="task-card__header">
+                        {plant.hasPhoto ? (
+                          <img
+                            className="task-card__thumb"
+                            src={`/plant-guide/images/${plant.photoPath}`}
+                            alt={plant.name}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="task-card__thumb task-card__thumb--placeholder">🌿</div>
+                        )}
+                        <div className="task-card__header-text">
+                          <div className="task-card__name-row">
+                            <span className="task-card__num">#{plant.number}</span>
+                            <span className="task-card__name">{plant.name}</span>
+                          </div>
+                          <div className="task-card__method">{methodLabel(plant.wateringMethod)}</div>
+                        </div>
+                      </div>
+                      <div className="task-card__instruction">{plant.simpleInstruction}</div>
+                      <div className="task-card__water-dates">
+                        <div>
+                          <div className="task-card__water-label">Last watered</div>
+                          <div className="task-card__water-value">{fmtLastWatered(plant)}</div>
+                        </div>
+                        <div>
+                          <div className="task-card__water-label">Should water</div>
+                          <div className="task-card__water-value">{fmtNextWater(plant)}</div>
+                        </div>
+                      </div>
+                      {plant.warnings && plant.warnings.length > 0 && (
+                        <div className="task-card__warnings">
+                          {plant.warnings.map((w, i) => (
+                            <div key={i} className="warning-pill">⚠️ {w}</div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="task-card__method">{methodLabel(plant.wateringMethod)}</div>
+                    <button
+                      className="btn btn--water"
+                      disabled={confirming === plant.id}
+                      onClick={() => handleWater(plant)}
+                    >
+                      {confirming === plant.id ? '✓' : 'Mark Watered'}
+                    </button>
                   </div>
-                </div>
-                <div className="task-card__instruction">{plant.simpleInstruction}</div>
-                <div className="task-card__water-dates">
-                  <div>
-                    <div className="task-card__water-label">Last watered</div>
-                    <div className="task-card__water-value">{fmtLastWatered(plant)}</div>
-                  </div>
-                  <div>
-                    <div className="task-card__water-label">Should water</div>
-                    <div className="task-card__water-value">{fmtNextWater(plant)}</div>
-                  </div>
-                </div>
-                {plant.warnings && plant.warnings.length > 0 && (
-                  <div className="task-card__warnings">
-                    {plant.warnings.map((w, i) => (
-                      <div key={i} className="warning-pill">⚠️ {w}</div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
-              <button
-                className="btn btn--water"
-                disabled={confirming === plant.id}
-                onClick={() => handleWater(plant)}
-              >
-                {confirming === plant.id ? '✓' : 'Mark Watered'}
-              </button>
             </div>
           ))}
         </div>
