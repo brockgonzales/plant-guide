@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { initialPlants } from '../data/initialPlants'
+import { applyRelocation2026 } from '../data/relocation2026'
 
 export function usePlants() {
   const [plants, setPlants] = useState([])
@@ -57,6 +58,7 @@ export function usePlants() {
             if (plant) setDoc(doc(db, 'plants', newId), plant)
           }
         }
+        applyRelocation2026(db, firestorePlants)
       }
     })
 

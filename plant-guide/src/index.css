@@ -343,6 +343,20 @@ input, select, textarea { font: inherit; }
 .watered-pill__next { font-size: 12px; color: var(--text-mid); }
 
 /* ── Plant Grid ────────────────────────────────────────────────── */
+.plant-grid-sections { display: flex; flex-direction: column; gap: 28px; }
+
+.plant-grid-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .plant-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
