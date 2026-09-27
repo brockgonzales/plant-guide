@@ -346,9 +346,9 @@ input, select, textarea { font: inherit; }
 .plant-grid-sections { display: flex; flex-direction: column; gap: 28px; }
 
 .plant-grid-section__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-mid);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--green-700);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin-bottom: 12px;
