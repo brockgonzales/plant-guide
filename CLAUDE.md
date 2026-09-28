@@ -120,33 +120,14 @@ GitHub Pages sets long cache lifetimes on JS/CSS assets. If the live site looks 
 
 ## Plant Inventory
 
-28 active plants, numbered 1–29. Plant 5 (Prayer Plant) is deceased. Plant 18 was removed as a duplicate of Plant 9.
+As of the Sept 2026 repot (Session 9): 30 active plants, numbered 1–33, grouped into four window locations. Retired: #5 Prayer Plant (deceased), #18 (duplicate of #9), #25 African Violet (deceased Sept 2026). Location strings must match exactly — `PlantGrid` groups on them and anything else lands in "Other".
 
-- Plants 1 & 2 — Raven ZZ Plants (hallway, south window)
-- Plant 3 — Red Nerve Plant / Fittonia (kitchen, north window)
-- Plant 4 — Cast Iron Plant, variegated (kitchen, north window)
-- Plant 6 — Ripple Peperomia (living room, south + UV filter)
-- Plant 7 — Zebra Plant / Aphelandra (kitchen, north window)
-- Plant 8 — Dragon Tree / Dracaena (hallway, bright indirect)
-- Plant 9 — White/green Nerve Plant / Fittonia (living room)
-- Plant 10 — Black Rubber Plant / Ficus elastica 'Burgundy' (living room)
-- Plant 11 — Stromanthe 'Triostar' (living room, northwest window)
-- Plants 12 & 14 — Chinese Evergreen green/cream; Silver-blue Philodendron (hallway)
-- Plant 13 — Chinese Evergreen white/silver, large (hallway, floor)
-- Plant 15 — Snake Plant, variegated (hallway, south window)
-- Plant 16 — Heartleaf Philodendron, trailing (hallway, south window)
-- Plant 17 — Anthurium (hallway, bright indirect corner)
-- Plant 19 — Corn Plant / Dracaena fragrans, ~20 years old (living room)
-- Plant 20 — Variegated Rubber Plant 'Tineke' (living room)
-- Plant 21 — Jade Plant (living room, northwest window)
-- Plant 22 — Purple Passion (kitchen, north window)
-- Plant 23 — Autograph Tree / Hoya (kitchen area)
-- Plant 24 — Wandering Dude / Tradescantia (location TBD)
-- Plant 25 — African Violet (location TBD)
-- Plant 26 — Red Chinese Evergreen / Aglaonema 'Siam Aurora' (location TBD)
-- Plant 27 — White/Cream Chinese Evergreen (location TBD)
-- Plant 28 — Neon Pothos (kitchen, north window)
-- Plant 29 — Philodendron 'Prince of Orange' (hallway, direct sun)
+- **Desk Window:** #16 Heartleaf Philodendron (1 of 2), #23 Autograph Tree, #32 Pink Nerve Plant
+- **Kitchen Window:** #3 Red Nerve Plant, #12 Chinese Evergreen green/cream, #28 Neon Pothos, #33 Baby Rubber Plant (Peperomia obtusifolia)
+- **Living Room Window:** #7 Zebra Plant, #10 Black Rubber Plant (1 of 2), #13 Chinese Evergreen white/silver, #30 Black Rubber Plant (2 of 2)
+- **Stairwell Window:** #1 & #2 Raven ZZ, #4 Cast Iron Plant, #6 Ripple Peperomia, #8 Dragon Tree, #9 White/green Nerve Plant, #11 Stromanthe 'Triostar', #14 Silver-blue Philodendron, #15 Snake Plant, #17 Anthurium, #19 Corn Plant, #20 Rubber Plant 'Tineke', #21 Jade Plant, #22 Purple Passion, #24 Wandering Dude, #26 Red Chinese Evergreen 'Siam Aurora', #27 White/Cream Chinese Evergreen, #29 Philodendron 'Prince of Orange', #31 Heartleaf Philodendron (2 of 2)
+
+#30 and #31 are the halves of #10 and #16, split during repotting. Current photos are `public/images/plant-N-v2.jpg`; the older `plant-N.jpg` files are no longer referenced by active plants.
 
 ---
 
@@ -419,3 +400,49 @@ Twilio requires A2P 10DLC registration before a long-code number can send SMS in
 5. **Install Playwright MCP** (Phase 7 command above) and use it to functionally test the bulk-edit v2 flow in a real browser before relying on it for the pre-trip data entry — this has only been build-verified, not click-tested.
 6. If Brock wants the app's plant photos themselves refreshed to match the new pots/locations, the actual image files still need to be added to `plant-guide/public/images/` and committed — not started.
 7. No action needed, just a standing note: `GMAIL_APP_PASSWORD` remains an unused/deprecated secret sitting in Firebase Secret Manager (see Session 4) — harmless, just noise.
+
+---
+
+### Session 8 — Twilio A2P rejection round 2, email-only trip fallback confirmed (2026-09-26)
+
+**Context coming in:** India trip starts 2026-10-01 (5 days out at session start). Session 7 had left the A2P Campaign "In Review, not yet confirmed approved." This session found it had actually come back **rejected** in the interim.
+
+**Trip dates — confirmed set.** Brock confirmed the India trip (10/1–10/15) is already entered via Admin Panel → Set Trip. Item #2 from Session 7's pending list is done.
+
+**Twilio A2P Campaign — rejected, then resubmitted, now back in review:**
+- Rejection reason: Twilio error code [30886](https://twilio.com/docs/api/errors/30886) — "Campaign Description field does not clearly explain the messaging program" / "includes personal information instead of a general summary." The original description leaned on "personal-use," "single recipient," and "single-tenant," which carrier vetting reads as a signal of disguised P2P messaging (the same underlying issue as Session 7's Rejection 1, just resurfacing in a subtler form).
+- Rewrote the description to drop that language and instead state sender/recipient/purpose plainly: *"Plant Guide is a home plant care management application. Its Firebase Cloud Functions backend sends automated SMS reminders to a phone number entered into the app's notification settings by the administrator, alerting the recipient which houseplants need watering that day. Messages are sent at most once per day, only on days when a plant is due for watering, and only during active trip periods configured in the app. Reply STOP to opt out or HELP for help."* Brock submitted this verbatim.
+- Verified in Trust Hub that the Assigned A2P Brand is named **"Plant Guide"** (Approved) — matches how the new description refers to itself, so no brand/description mismatch expected this round.
+- **Current status: "In Review" again.** Twilio's own banner states review "may take several weeks," which will likely outlast the trip start — treat this as out of our hands until Twilio responds; no further description changes needed unless another rejection comes in.
+
+**Backup plan established (in case A2P never approves in time):** No code changes needed — SendGrid email has worked independently of Twilio since Session 4. Confirmed via code read of `functions/index.js`'s `sendViaChannel()`: on channel `'both'`, email is always attempted *before* text with no shared try/catch, so a Twilio failure never blocks or retracts an already-sent email. **Brock has left the channel setting as "Email only"** in Admin Panel → Notifications — this alone fully covers the trip regardless of Twilio's outcome. ("Email and text" would be a strict upgrade with no downside — auto-picks up SMS if the campaign approves mid-trip — but Brock chose to leave it on email only, so respect that unless he asks to change it.)
+
+**Twilio account closure steps (given to Brock as reference, not executed):** if he decides to abandon Twilio — (1) release the phone number in Console → Phone Numbers → Manage → Active Numbers to stop recurring charges, (2) zero out any Billing balance, (3) Console → Account → General Settings → Close Account (or a support ticket if that option isn't available for the account type). Brand/Campaign registration fees already paid are non-refundable. Not acted on this session — Twilio account is still active and the campaign is still in review.
+
+**No code or file changes this session** — all work was Twilio-console troubleshooting via Brock's screenshots plus one read of `functions/index.js` to verify send-order/error-isolation behavior. Nothing to deploy.
+
+**Everything pending — pick up here next session:**
+1. **Check Twilio A2P Campaign status again** — "In Review" as of this session, brand name now confirmed matching, may take weeks per Twilio's own estimate. If rejected again, get the exact new error code before guessing at another rewrite.
+2. **Resolve the plant photo identification from Session 7 Phase 5** — Brock said he'll redo this "separately, targeting tomorrow" (2026-09-27): fresh photos of each plant with corrected locations, plus names/species for the two unidentified new plants. Do not write guessed locations into Firestore without this.
+3. **Once #2 is resolved:** use the bulk-edit v2 flow to update locations, add the two new plants via "+ Add New Plant," and get fall/winter watering-frequency numbers from Brock (same open item as Session 7).
+4. **Install Playwright MCP** (Session 7 Phase 7 command) — still not installed; use it to functionally test bulk-edit v2 before the pre-trip data entry.
+5. Standing note, no action: `GMAIL_APP_PASSWORD` unused secret in Firebase Secret Manager (Session 4) — harmless noise.
+
+---
+
+### Session 9 — Plant re-photo, window-location sections, relocation data update (2026-09-27)
+
+- Brock photographed every plant into `Plant Pictures/<Window>/` folders (31 photos). IDs were worked out photo-by-photo with Brock's corrections — **trust his in-person IDs over photo reads**; several of my initial visual guesses were wrong (e.g. Stair_0030 is the red Aglaonema #26, not Stromanthe).
+- Outcome: 4 locations (Desk / Kitchen / Living Room / Stairwell Window), #10 and #16 each split into two pots (new #30, #31), two new species (#32 Pink Nerve Plant, #33 Baby Rubber Plant), #25 African Violet deceased. Full list in Plant Inventory above.
+- All Plants (`PlantGrid.jsx`) and the Today tab's due list (`TodayTasks.jsx`) both render in sections per window, via the shared `groupByLocation()` in `src/data/locations.js` (fixed order, catch-all "Other"). Section headers (`.location-section__title`) are 20px bold `--green-700`. "Completed today" is still one flat list.
+- Data was applied via a one-time client-side update, `src/data/relocation2026.js`, called from `usePlants`. It runs once on the first app load after deploy, in a single Firestore batch, and sets `config/migrations.relocation2026_09 = true` so it never re-runs or overwrites later Admin Panel edits. #30/#31 are cloned from the live #10/#16 docs (minus any `nextWaterDate` override).
+- **Privacy fix:** every published plant photo carried iPhone GPS EXIF pointing at Brock's home. All `public/images/plant-*.jpg` were re-encoded without EXIF (Pillow in a scratch venv; no exiftool on this machine). Raw `Plant Pictures/` is gitignored. The old GPS-tagged images still exist in the public repo's git history — cleaning that needs a history rewrite + force-push, not done; Brock's call (making the repo private is the simpler option).
+- `claude` CLI is not on PATH inside the VSCode extension, so `claude mcp add` doesn't work from Bash here — add Playwright via `/mcp` → Add server (stdio: `npx -y @playwright/mcp@latest`) or a root `.mcp.json`, then restart.
+- Commits `caf247d` (relocation), `e6e7978` (header style), `e292203` (Today sections) — all deployed and confirmed live; Brock confirmed both views look right.
+
+**Pending:**
+1. ~~Confirm relocation applied~~ — confirmed by Brock 2026-09-27.
+2. Twilio A2P Campaign still "In Review" (see Session 8); email-only notifications cover the trip.
+3. Fall/winter watering intervals — still never provided by Brock.
+4. #16/#31 `lightNeeds` still say "Direct south sun" from the old spot; review light/care notes for moved plants.
+5. Install Playwright MCP to click-test the new sections and bulk-edit v2.
