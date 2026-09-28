@@ -2,9 +2,15 @@ import { useState, useEffect } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { fns } from '../firebase'
 import { WATERING_METHODS, initialPlants } from '../data/initialPlants'
-import { groupByLocation } from '../data/locations'
+import { groupByLocation, LOCATION_ORDER } from '../data/locations'
 
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234'
+
+const BLANK_SCHEDULE = { wateringIntervalDays: '', wateringIntervalMaxDays: '', wateringMethod: '' }
+
+function localDateString(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 const BLANK_PLANT = {
   number: '',
@@ -46,9 +52,11 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
   })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
-  const [bulkStep, setBulkStep] = useState('select')
   const [bulkSelected, setBulkSelected] = useState(() => new Set())
-  const [bulkFields, setBulkFields] = useState({ location: '', wateringIntervalDays: '', wateringIntervalMaxDays: '', wateringMethod: '' })
+  const [bulkMode, setBulkMode] = useState(null)
+  const [bulkLocation, setBulkLocation] = useState('')
+  const [bulkDate, setBulkDate] = useState('')
+  const [bulkFields, setBulkFields] = useState(BLANK_SCHEDULE)
   const [bulkSaving, setBulkSaving] = useState(false)
   const [notifForm, setNotifForm] = useState(null)
   const [notifSaved, setNotifSaved] = useState(false)
@@ -82,12 +90,9 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
     setView('add-plant')
   }
 
-  function startBulkEdit() {
-    setBulkStep('select')
-    setBulkSelected(new Set())
-    setBulkFields({ location: '', wateringIntervalDays: '', wateringIntervalMaxDays: '', wateringMethod: '' })
-    setView('bulk-edit')
-  }
+  const activeIds = plants.filter(p => p.isActive).map(p => p.id)
+  const allSelected = activeIds.length > 0 && activeIds.every(id => bulkSelected.has(id))
+  const selectedPlants = plants.filter(p => p.isActive && bulkSelected.has(p.id))
 
   function toggleBulkSelect(id) {
     setBulkSelected(prev => {
@@ -98,34 +103,61 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
     })
   }
 
-  function selectAllBulk() {
-    setBulkSelected(new Set(plants.filter(p => p.isActive).map(p => p.id)))
+  function toggleSelectAll() {
+    setBulkSelected(allSelected ? new Set() : new Set(activeIds))
   }
 
-  function clearBulkSelection() {
-    setBulkSelected(new Set())
+  function openBulk(mode) {
+    setBulkLocation('')
+    setBulkDate(localDateString())
+    setBulkFields(BLANK_SCHEDULE)
+    setBulkMode(mode)
   }
 
   function bulkFieldChange(field, val) {
     setBulkFields(f => ({ ...f, [field]: val }))
   }
 
-  async function applyBulkEdits() {
+  function scheduleUpdates() {
     const updates = {}
-    if (bulkFields.location.trim() !== '') updates.location = bulkFields.location.trim()
     if (bulkFields.wateringIntervalDays !== '') updates.wateringIntervalDays = parseInt(bulkFields.wateringIntervalDays)
     if (bulkFields.wateringIntervalMaxDays !== '') updates.wateringIntervalMaxDays = parseInt(bulkFields.wateringIntervalMaxDays)
     if (bulkFields.wateringMethod !== '') updates.wateringMethod = bulkFields.wateringMethod
-    if (Object.keys(updates).length === 0 || bulkSelected.size === 0) return
+    return updates
+  }
+
+  const bulkReady =
+    (bulkMode === 'location' && bulkLocation !== '') ||
+    (bulkMode === 'watering' && bulkDate !== '') ||
+    (bulkMode === 'schedule' && Object.keys(scheduleUpdates()).length > 0)
+
+  async function applyBulk() {
+    const ids = selectedPlants.map(p => p.id)
+    if (!bulkReady || ids.length === 0) return
+    const count = `${ids.length} plant${ids.length === 1 ? '' : 's'}`
 
     setBulkSaving(true)
-    const ids = [...bulkSelected]
-    await Promise.all(ids.map(id => updatePlant(id, updates)))
-    setBulkSaving(false)
-    flash(`${ids.length} plant${ids.length === 1 ? '' : 's'} updated!`)
-    setBulkSelected(new Set())
-    setBulkFields({ location: '', wateringIntervalDays: '', wateringIntervalMaxDays: '', wateringMethod: '' })
-    setBulkStep('select')
+    try {
+      if (bulkMode === 'location') {
+        await Promise.all(ids.map(id => updatePlant(id, { location: bulkLocation })))
+        flash(`${count} moved to ${bulkLocation}`)
+      } else if (bulkMode === 'watering') {
+        await Promise.all(ids.map(id => logWateringOnDate(id, bulkDate)))
+        const shown = new Date(bulkDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        flash(`Watering on ${shown} logged for ${count}`)
+      } else {
+        const updates = scheduleUpdates()
+        await Promise.all(ids.map(id => updatePlant(id, updates)))
+        flash(`Watering schedule updated for ${count}`)
+      }
+      setBulkSelected(new Set())
+      setBulkMode(null)
+    } catch (err) {
+      console.error('Bulk update failed', err)
+      flash('Something went wrong — some plants may not have updated. Please try again.')
+    } finally {
+      setBulkSaving(false)
+    }
   }
 
   function pfChange(field, val) {
@@ -252,12 +284,12 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
   }
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && view === 'home' && onClose()}>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && view === 'home' && selectedPlants.length === 0 && onClose()}>
       <div className="modal">
         <button className="modal__close" onClick={onClose}>✕</button>
         <div className="modal__body">
 
-          {msg && <div className="alert alert--success">{msg}</div>}
+          {msg && <div className="alert alert--success admin-flash">{msg}</div>}
 
           {view === 'home' && (
             <>
@@ -283,8 +315,13 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                 <h3>Plants</h3>
                 <div className="admin-row">
                   <button className="btn btn--primary" onClick={startAdd}>+ Add New Plant</button>
-                  <button className="btn" onClick={startBulkEdit}>Bulk Edit Location/Watering</button>
                 </div>
+                <p className="text-muted admin-select-hint">Check plants to update their location, log a past watering, or change their watering schedule all at once.</p>
+                <label className="bulk-select-all">
+                  <input className="bulk-select-row__checkbox" type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+                  Select all plants
+                  {selectedPlants.length > 0 && <span className="bulk-toolbar__count">· {selectedPlants.length} selected</span>}
+                </label>
                 <div className="location-sections admin-plant-sections">
                   {[
                     ...groupByLocation(plants.filter(p => p.isActive)),
@@ -295,23 +332,59 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                         {location}
                         <span className="badge badge--neutral">{group.length}</span>
                       </h3>
-                      <div className="admin-plant-list">
-                        {group.map(p => (
-                          <div key={p.id} className={`admin-plant-row ${!p.isActive ? 'admin-plant-row--inactive' : ''}`}>
-                            <span className="admin-plant-row__name">#{p.number} {p.name}</span>
-                            <div className="admin-row">
-                              <button className="btn btn--sm" onClick={() => startEdit(p)}>Edit</button>
-                              {p.isActive
-                                ? <button className="btn btn--sm btn--danger" onClick={() => deactivatePlant(p.id)}>Remove</button>
-                                : <button className="btn btn--sm btn--success" onClick={() => reactivatePlant(p.id)}>Restore</button>
-                              }
+                      <div className="bulk-select-list">
+                        {group.map(p => {
+                          const checked = bulkSelected.has(p.id)
+                          return (
+                            <div
+                              key={p.id}
+                              className={`bulk-select-row ${checked ? 'bulk-select-row--checked' : ''} ${!p.isActive ? 'admin-plant-row--inactive' : ''}`}
+                              onClick={p.isActive ? () => toggleBulkSelect(p.id) : undefined}
+                            >
+                              {p.isActive && (
+                                <input
+                                  className="bulk-select-row__checkbox"
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleBulkSelect(p.id)}
+                                  onClick={e => e.stopPropagation()}
+                                />
+                              )}
+                              {p.hasPhoto ? (
+                                <img className="bulk-select-row__thumb" src={`/plant-guide/images/${p.photoPath}`} alt={p.name} loading="lazy" />
+                              ) : (
+                                <div className="bulk-select-row__thumb bulk-select-row__thumb--placeholder">🌿</div>
+                              )}
+                              <div className="bulk-select-row__info">
+                                <div className="bulk-select-row__name">#{p.number} {p.name}</div>
+                                <div className="bulk-select-row__location">{p.location || 'No location set'}</div>
+                              </div>
+                              <div className="admin-plant-row__actions" onClick={e => e.stopPropagation()}>
+                                <button className="btn btn--sm" onClick={() => startEdit(p)}>Edit</button>
+                                {p.isActive
+                                  ? <button className="btn btn--sm btn--danger" onClick={() => deactivatePlant(p.id)}>Remove</button>
+                                  : <button className="btn btn--sm btn--success" onClick={() => reactivatePlant(p.id)}>Restore</button>
+                                }
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   ))}
                 </div>
+
+                {selectedPlants.length > 0 && (
+                  <div className="bulk-sticky-bar">
+                    <span className="bulk-toolbar__count">{selectedPlants.length} selected</span>
+                    <div className="bulk-actions">
+                      <button className="btn btn--sm btn--primary" onClick={() => openBulk('location')}>Update location</button>
+                      <button className="btn btn--sm btn--primary" onClick={() => openBulk('watering')}>Add past watering</button>
+                      <button className="btn btn--sm" onClick={() => openBulk('schedule')}>Watering schedule</button>
+                      <button className="btn btn--sm" onClick={() => setBulkSelected(new Set())}>Clear</button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="admin-section">
@@ -519,122 +592,6 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
             </>
           )}
 
-          {view === 'bulk-edit' && bulkStep === 'select' && (
-            <>
-              <button className="btn btn--back" onClick={() => setView('home')}>← Back</button>
-              <h2>Bulk Edit Plants</h2>
-              <p className="text-muted">Check every plant you want to update, then set the new location and/or watering schedule once — it'll apply to all of them together.</p>
-
-              <div className="bulk-toolbar">
-                <span className="bulk-toolbar__count">{bulkSelected.size} selected</span>
-                <div className="admin-row" style={{ marginTop: 0 }}>
-                  <button className="btn btn--sm" onClick={selectAllBulk}>Select All</button>
-                  <button className="btn btn--sm" onClick={clearBulkSelection}>Clear</button>
-                </div>
-              </div>
-
-              <div className="location-sections bulk-sections">
-                {groupByLocation(plants.filter(p => p.isActive)).map(([location, group]) => (
-                  <div key={location}>
-                    <h3 className="location-section__title">
-                      {location}
-                      <span className="badge badge--neutral">{group.length}</span>
-                    </h3>
-                    <div className="bulk-select-list">
-                      {group.map(p => {
-                        const checked = bulkSelected.has(p.id)
-                        return (
-                          <div
-                            key={p.id}
-                            className={`bulk-select-row ${checked ? 'bulk-select-row--checked' : ''}`}
-                            onClick={() => toggleBulkSelect(p.id)}
-                          >
-                            <input
-                              className="bulk-select-row__checkbox"
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleBulkSelect(p.id)}
-                              onClick={e => e.stopPropagation()}
-                            />
-                            {p.hasPhoto ? (
-                              <img className="bulk-select-row__thumb" src={`/plant-guide/images/${p.photoPath}`} alt={p.name} loading="lazy" />
-                            ) : (
-                              <div className="bulk-select-row__thumb bulk-select-row__thumb--placeholder">🌿</div>
-                            )}
-                            <div className="bulk-select-row__info">
-                              <div className="bulk-select-row__name">#{p.number} {p.name}</div>
-                              <div className="bulk-select-row__location">{p.location || 'No location set'}</div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bulk-sticky-bar">
-                <span className="bulk-toolbar__count">{bulkSelected.size} selected</span>
-                <button className="btn btn--primary" disabled={bulkSelected.size === 0} onClick={() => setBulkStep('apply')}>
-                  Continue →
-                </button>
-              </div>
-            </>
-          )}
-
-          {view === 'bulk-edit' && bulkStep === 'apply' && (
-            <>
-              <button className="btn btn--back" onClick={() => setBulkStep('select')}>← Back to selection</button>
-              <h2>Apply Changes</h2>
-              <p className="bulk-apply-summary">
-                Updating <strong>{bulkSelected.size}</strong> plant{bulkSelected.size === 1 ? '' : 's'}:{' '}
-                {plants.filter(p => bulkSelected.has(p.id)).map(p => `#${p.number} ${p.name}`).join(', ')}
-              </p>
-              <p className="bulk-apply-hint">Leave a field blank (or "No change") to leave it as-is on the selected plants.</p>
-
-              <div className="form-grid">
-                <label className="form-label form-label--full">Location
-                  <input
-                    className="input"
-                    value={bulkFields.location}
-                    onChange={e => bulkFieldChange('location', e.target.value)}
-                    placeholder="Leave blank to keep existing locations"
-                  />
-                </label>
-                <label className="form-label">Water every (min days)
-                  <input
-                    className="input"
-                    type="number"
-                    value={bulkFields.wateringIntervalDays}
-                    onChange={e => bulkFieldChange('wateringIntervalDays', e.target.value)}
-                    placeholder="No change"
-                  />
-                </label>
-                <label className="form-label">Water every (max days)
-                  <input
-                    className="input"
-                    type="number"
-                    value={bulkFields.wateringIntervalMaxDays}
-                    onChange={e => bulkFieldChange('wateringIntervalMaxDays', e.target.value)}
-                    placeholder="No change"
-                  />
-                </label>
-                <label className="form-label form-label--full">Watering Method
-                  <select className="input" value={bulkFields.wateringMethod} onChange={e => bulkFieldChange('wateringMethod', e.target.value)}>
-                    <option value="">— No change —</option>
-                    {Object.entries(WATERING_METHODS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <button className="btn btn--primary btn--full" onClick={applyBulkEdits} disabled={bulkSaving}>
-                {bulkSaving ? 'Applying...' : `Apply to ${bulkSelected.size} plant${bulkSelected.size === 1 ? '' : 's'}`}
-              </button>
-            </>
-          )}
-
           {view === 'trip' && (
             <>
               <button className="btn btn--back" onClick={() => setView('home')}>← Back</button>
@@ -662,6 +619,66 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
           )}
         </div>
       </div>
+
+      {bulkMode && (
+        <div className="dialog-overlay">
+          <div className="dialog" role="dialog" aria-modal="true">
+            <h2 className="dialog__title">
+              {bulkMode === 'location' && 'Update location'}
+              {bulkMode === 'watering' && 'Add past watering'}
+              {bulkMode === 'schedule' && 'Watering schedule'}
+            </h2>
+            <p className="bulk-apply-summary">
+              <strong>{selectedPlants.length}</strong> plant{selectedPlants.length === 1 ? '' : 's'}:{' '}
+              {selectedPlants.map(p => `#${p.number} ${p.name}`).join(', ')}
+            </p>
+
+            {bulkMode === 'location' && (
+              <label className="form-label form-label--full">Move to
+                <select className="input" value={bulkLocation} onChange={e => setBulkLocation(e.target.value)}>
+                  <option value="">— Choose a window —</option>
+                  {LOCATION_ORDER.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                </select>
+              </label>
+            )}
+
+            {bulkMode === 'watering' && (
+              <label className="form-label form-label--full">Date watered
+                <input className="input" type="date" value={bulkDate} max={localDateString()} onChange={e => setBulkDate(e.target.value)} />
+              </label>
+            )}
+
+            {bulkMode === 'schedule' && (
+              <>
+                <p className="bulk-apply-hint">Leave a field blank (or "No change") to keep it as-is.</p>
+                <div className="form-grid">
+                  <label className="form-label">Water every (min days)
+                    <input className="input" type="number" value={bulkFields.wateringIntervalDays} onChange={e => bulkFieldChange('wateringIntervalDays', e.target.value)} placeholder="No change" />
+                  </label>
+                  <label className="form-label">Water every (max days)
+                    <input className="input" type="number" value={bulkFields.wateringIntervalMaxDays} onChange={e => bulkFieldChange('wateringIntervalMaxDays', e.target.value)} placeholder="No change" />
+                  </label>
+                  <label className="form-label form-label--full">Watering Method
+                    <select className="input" value={bulkFields.wateringMethod} onChange={e => bulkFieldChange('wateringMethod', e.target.value)}>
+                      <option value="">— No change —</option>
+                      {Object.entries(WATERING_METHODS).map(([k, v]) => (
+                        <option key={k} value={k}>{v}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </>
+            )}
+
+            <div className="dialog__actions">
+              <button className="btn" onClick={() => setBulkMode(null)} disabled={bulkSaving}>Cancel</button>
+              <button className="btn btn--primary" onClick={applyBulk} disabled={!bulkReady || bulkSaving}>
+                {bulkSaving ? 'Saving...' : `Apply to ${selectedPlants.length} plant${selectedPlants.length === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
