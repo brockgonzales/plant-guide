@@ -285,16 +285,29 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                   <button className="btn btn--primary" onClick={startAdd}>+ Add New Plant</button>
                   <button className="btn" onClick={startBulkEdit}>Bulk Edit Location/Watering</button>
                 </div>
-                <div className="admin-plant-list">
-                  {plants.map(p => (
-                    <div key={p.id} className={`admin-plant-row ${!p.isActive ? 'admin-plant-row--inactive' : ''}`}>
-                      <span className="admin-plant-row__name">#{p.number} {p.name}</span>
-                      <div className="admin-row">
-                        <button className="btn btn--sm" onClick={() => startEdit(p)}>Edit</button>
-                        {p.isActive
-                          ? <button className="btn btn--sm btn--danger" onClick={() => deactivatePlant(p.id)}>Remove</button>
-                          : <button className="btn btn--sm btn--success" onClick={() => reactivatePlant(p.id)}>Restore</button>
-                        }
+                <div className="location-sections admin-plant-sections">
+                  {[
+                    ...groupByLocation(plants.filter(p => p.isActive)),
+                    ...(plants.some(p => !p.isActive) ? [['Removed', plants.filter(p => !p.isActive)]] : []),
+                  ].map(([location, group]) => (
+                    <div key={location}>
+                      <h3 className="location-section__title">
+                        {location}
+                        <span className="badge badge--neutral">{group.length}</span>
+                      </h3>
+                      <div className="admin-plant-list">
+                        {group.map(p => (
+                          <div key={p.id} className={`admin-plant-row ${!p.isActive ? 'admin-plant-row--inactive' : ''}`}>
+                            <span className="admin-plant-row__name">#{p.number} {p.name}</span>
+                            <div className="admin-row">
+                              <button className="btn btn--sm" onClick={() => startEdit(p)}>Edit</button>
+                              {p.isActive
+                                ? <button className="btn btn--sm btn--danger" onClick={() => deactivatePlant(p.id)}>Remove</button>
+                                : <button className="btn btn--sm btn--success" onClick={() => reactivatePlant(p.id)}>Restore</button>
+                              }
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}

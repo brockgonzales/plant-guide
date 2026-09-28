@@ -345,7 +345,7 @@ input, select, textarea { font: inherit; }
 /* ── Plant Grid ────────────────────────────────────────────────── */
 .location-sections { display: flex; flex-direction: column; gap: 28px; }
 
-.location-section__title {
+.location-sections .location-section__title {
   font-size: 20px;
   font-weight: 800;
   color: var(--green-700);
@@ -685,6 +685,8 @@ input, select, textarea { font: inherit; }
 .admin-row { display: flex; gap: 8px; margin-top: 8px; }
 
 .admin-plant-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.admin-plant-sections { margin-top: 16px; }
+.admin-plant-sections .admin-plant-list { margin-top: 0; }
 
 .admin-section--log { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); border-bottom: none; }
 
