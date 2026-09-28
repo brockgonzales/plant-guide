@@ -725,7 +725,8 @@ input, select, textarea { font: inherit; }
 .bulk-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; }
 .bulk-toolbar__count { font-size: 13px; font-weight: 600; color: var(--text-mid); }
 
-.bulk-select-list { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 80px; }
+.bulk-sections { margin: 16px 0 80px; }
+.bulk-select-list { display: flex; flex-direction: column; gap: 10px; }
 .bulk-select-row {
   display: flex;
   align-items: center;

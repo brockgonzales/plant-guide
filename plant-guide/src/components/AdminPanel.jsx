@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { fns } from '../firebase'
 import { WATERING_METHODS, initialPlants } from '../data/initialPlants'
+import { groupByLocation } from '../data/locations'
 
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234'
 
@@ -519,34 +520,44 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                 </div>
               </div>
 
-              <div className="bulk-select-list">
-                {plants.filter(p => p.isActive).map(p => {
-                  const checked = bulkSelected.has(p.id)
-                  return (
-                    <div
-                      key={p.id}
-                      className={`bulk-select-row ${checked ? 'bulk-select-row--checked' : ''}`}
-                      onClick={() => toggleBulkSelect(p.id)}
-                    >
-                      <input
-                        className="bulk-select-row__checkbox"
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleBulkSelect(p.id)}
-                        onClick={e => e.stopPropagation()}
-                      />
-                      {p.hasPhoto ? (
-                        <img className="bulk-select-row__thumb" src={`/plant-guide/images/${p.photoPath}`} alt={p.name} loading="lazy" />
-                      ) : (
-                        <div className="bulk-select-row__thumb bulk-select-row__thumb--placeholder">🌿</div>
-                      )}
-                      <div className="bulk-select-row__info">
-                        <div className="bulk-select-row__name">#{p.number} {p.name}</div>
-                        <div className="bulk-select-row__location">{p.location || 'No location set'}</div>
-                      </div>
+              <div className="location-sections bulk-sections">
+                {groupByLocation(plants.filter(p => p.isActive)).map(([location, group]) => (
+                  <div key={location}>
+                    <h3 className="location-section__title">
+                      {location}
+                      <span className="badge badge--neutral">{group.length}</span>
+                    </h3>
+                    <div className="bulk-select-list">
+                      {group.map(p => {
+                        const checked = bulkSelected.has(p.id)
+                        return (
+                          <div
+                            key={p.id}
+                            className={`bulk-select-row ${checked ? 'bulk-select-row--checked' : ''}`}
+                            onClick={() => toggleBulkSelect(p.id)}
+                          >
+                            <input
+                              className="bulk-select-row__checkbox"
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleBulkSelect(p.id)}
+                              onClick={e => e.stopPropagation()}
+                            />
+                            {p.hasPhoto ? (
+                              <img className="bulk-select-row__thumb" src={`/plant-guide/images/${p.photoPath}`} alt={p.name} loading="lazy" />
+                            ) : (
+                              <div className="bulk-select-row__thumb bulk-select-row__thumb--placeholder">🌿</div>
+                            )}
+                            <div className="bulk-select-row__info">
+                              <div className="bulk-select-row__name">#{p.number} {p.name}</div>
+                              <div className="bulk-select-row__location">{p.location || 'No location set'}</div>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
               </div>
 
               <div className="bulk-sticky-bar">
