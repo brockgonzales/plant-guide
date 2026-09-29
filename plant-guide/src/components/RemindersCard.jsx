@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { getSavedName, isIOS, isStandalone } from '../hooks/useReminders'
 
 export default function RemindersCard({ reminders, isAdmin }) {
-  const { supported, permission, device, dismissed, enable, disable, sendTest, dismiss, undismiss } = reminders
+  const { supported, permission, device, dismissed, enable, disable, setAlwaysRemind: saveAlwaysRemind, sendTest, dismiss, undismiss } = reminders
   const [name, setName] = useState(getSavedName)
   const [alwaysRemind, setAlwaysRemind] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -16,7 +16,7 @@ export default function RemindersCard({ reminders, isAdmin }) {
       if (result !== false && success) setStatus(success)
     } catch (err) {
       console.error(err)
-      setStatus('Something went wrong — please try again.')
+      setStatus(err?.message ? `Didn't work: ${err.message}` : 'Something went wrong — please try again.')
     } finally {
       setBusy(false)
     }
@@ -30,6 +30,17 @@ export default function RemindersCard({ reminders, isAdmin }) {
         <div className="reminders-card__summary">
           🔔 Reminders on for <strong>{device.name}</strong> · {device.alwaysRemind ? 'every day plants need water' : 'during trips'}
         </div>
+        {isAdmin && (
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={Boolean(device.alwaysRemind)}
+              disabled={busy}
+              onChange={e => run(() => saveAlwaysRemind(e.target.checked))}
+            />
+            Remind me every day, not just during trips
+          </label>
+        )}
         <div className="reminders-card__actions">
           <button className="btn btn--sm" disabled={busy} onClick={() => run(sendTest, 'Test sent — check your notifications.')}>Send test</button>
           <button className="btn btn--sm" disabled={busy} onClick={() => run(disable)}>Turn off</button>

@@ -250,14 +250,18 @@ async function sendPush(db, devices, { title, body }) {
     targets.map(d => ({
       token: d.token,
       data: { title, body, url: './', tag: 'watering' },
-      webpush: { headers: { Urgency: 'high' } },
+      webpush: {
+        headers: { Urgency: 'high' },
+        // Safari/iOS web push is only reliably delivered with a notification block.
+        notification: { title, body, icon: 'https://brockgonzales.github.io/plant-guide/icon-192.png', tag: 'watering' },
+      },
     }))
   )
   await Promise.all(
     res.responses.map(async (r, i) => {
       if (r.success) return
       const code = r.error?.code
-      console.warn(`Push to ${targets[i].name} failed: ${code}`)
+      console.warn(`Push to ${targets[i].name} failed: ${code} ${r.error?.message ?? ''}`)
       if (DEAD_TOKEN_CODES.includes(code)) await db.collection('devices').doc(targets[i].id).delete()
     })
   )
@@ -347,7 +351,10 @@ exports.sendTestPush = onCall(async request => {
 
   const { plants, log } = await loadPlantsAndLog(db)
   const duePlants = plants.filter(p => isDue(p, log)).sort((a, b) => a.number - b.number)
-  const { sent } = await sendPush(db, [{ ...deviceDoc.data(), id: deviceDoc.id }], buildPush(duePlants, { isTest: true }))
+  const device = { ...deviceDoc.data(), id: deviceDoc.id }
+  if (!device.token) throw new HttpsError('failed-precondition', 'This device has no push token — turn reminders off and on again')
+  const { sent, failed } = await sendPush(db, [device], buildPush(duePlants, { isTest: true }))
+  console.log(`Test push to ${device.name}: ${sent} sent, ${failed} failed`)
   if (!sent) throw new HttpsError('unavailable', 'Could not deliver to this device — try turning reminders off and on again')
   return { sent: true, plantCount: duePlants.length }
 })

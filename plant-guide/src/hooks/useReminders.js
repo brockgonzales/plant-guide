@@ -100,6 +100,10 @@ export function useReminders() {
     try { await deleteToken(getMessaging(app)) } catch { /* token may already be gone */ }
   }
 
+  async function setAlwaysRemind(value) {
+    await setDoc(doc(db, 'devices', deviceId), { alwaysRemind: value, updatedAt: serverTimestamp() }, { merge: true })
+  }
+
   async function sendTest() {
     const call = httpsCallable(fns, 'sendTestPush')
     const res = await call({ deviceId })
@@ -116,5 +120,5 @@ export function useReminders() {
     setDismissed(false)
   }
 
-  return { supported, permission, device, dismissed, enable, disable, sendTest, dismiss, undismiss }
+  return { supported, permission, device, dismissed, enable, disable, setAlwaysRemind, sendTest, dismiss, undismiss }
 }
