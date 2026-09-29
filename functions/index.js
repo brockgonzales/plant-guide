@@ -1,8 +1,9 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler')
-const { onCall } = require('firebase-functions/v2/https')
+const { onCall, HttpsError } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 const { initializeApp } = require('firebase-admin/app')
 const { getFirestore, Timestamp } = require('firebase-admin/firestore')
+const { getMessaging } = require('firebase-admin/messaging')
 const sgMail = require('@sendgrid/mail')
 const twilio = require('twilio')
 
@@ -165,6 +166,11 @@ async function loadData(db) {
     throw new Error('Recipient phone number not set')
   }
 
+  const { plants, log } = await loadPlantsAndLog(db)
+  return { enabled, recipientEmail, senderEmail, recipientPhone, channel, plants, log }
+}
+
+async function loadPlantsAndLog(db) {
   const plantsSnap = await db.collection('plants').where('isActive', '==', true).get()
   const plants = plantsSnap.docs.map(d => ({ ...d.data(), id: d.id }))
 
@@ -177,7 +183,7 @@ async function loadData(db) {
     .get()
   const log = logSnap.docs.map(d => ({ ...d.data(), id: d.id }))
 
-  return { enabled, recipientEmail, senderEmail, recipientPhone, channel, plants, log }
+  return { plants, log }
 }
 
 async function sendEmail(senderEmail, recipientEmail, subject, html, apiKey) {
@@ -210,6 +216,54 @@ async function sendViaChannel(channel, { recipientEmail, senderEmail, recipientP
   }
 }
 
+// ── Push notifications (home-screen app) ──────────────────────────
+
+const LOCATION_ORDER = ['Desk Window', 'Kitchen Window', 'Living Room Window', 'Stairwell Window']
+
+function buildPush(duePlants, { isTest } = {}) {
+  const prefix = isTest ? 'Test — ' : ''
+  if (!duePlants.length) {
+    return { title: `${prefix}Reminders are working 🌿`, body: 'No plants need water today.' }
+  }
+  const byLocation = new Map()
+  for (const p of duePlants) {
+    const loc = LOCATION_ORDER.includes(p.location) ? p.location : 'Other'
+    if (!byLocation.has(loc)) byLocation.set(loc, [])
+    byLocation.get(loc).push(`#${p.number} ${p.name}`)
+  }
+  const body = [...LOCATION_ORDER, 'Other']
+    .filter(loc => byLocation.has(loc))
+    .map(loc => `${loc}: ${byLocation.get(loc).join(', ')}`)
+    .join('\n')
+  const count = duePlants.length === 1 ? '1 plant needs' : `${duePlants.length} plants need`
+  return { title: `${prefix}🌿 ${count} water today`, body }
+}
+
+const DEAD_TOKEN_CODES = ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token']
+
+// devices: [{ id, token, name }]. Removes devices whose token is no longer valid.
+async function sendPush(db, devices, { title, body }) {
+  const targets = devices.filter(d => d.token)
+  if (!targets.length) return { sent: 0, failed: 0 }
+
+  const res = await getMessaging().sendEach(
+    targets.map(d => ({
+      token: d.token,
+      data: { title, body, url: './', tag: 'watering' },
+      webpush: { headers: { Urgency: 'high' } },
+    }))
+  )
+  await Promise.all(
+    res.responses.map(async (r, i) => {
+      if (r.success) return
+      const code = r.error?.code
+      console.warn(`Push to ${targets[i].name} failed: ${code}`)
+      if (DEAD_TOKEN_CODES.includes(code)) await db.collection('devices').doc(targets[i].id).delete()
+    })
+  )
+  return { sent: res.successCount, failed: res.failureCount }
+}
+
 // ── Scheduled daily notification ──────────────────────────────────
 
 const NOTIFICATION_SECRETS = [SENDGRID_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER]
@@ -222,18 +276,29 @@ exports.dailyWateringNotification = onSchedule(
   },
   async () => {
     const db = getFirestore()
-
     const tripActive = await isTripActive(db)
-    if (!tripActive) {
-      console.log('No active trip today — skipping notification')
-      return
-    }
+    const settingsDoc = await db.collection('settings').doc('notifications').get()
+    const tripRemindersOn = tripActive && settingsDoc.exists && settingsDoc.data().enabled
 
-    const { enabled, recipientEmail, senderEmail, recipientPhone, channel, plants, log } = await loadData(db)
-    if (!enabled) return
-
+    const { plants, log } = await loadPlantsAndLog(db)
     const duePlants = plants.filter(p => isDue(p, log)).sort((a, b) => a.number - b.number)
     if (!duePlants.length) return
+
+    // Brock's phone (alwaysRemind) every day; everyone else only during an active trip.
+    try {
+      const devicesSnap = await db.collection('devices').get()
+      const recipients = devicesSnap.docs
+        .map(d => ({ ...d.data(), id: d.id }))
+        .filter(d => d.alwaysRemind || tripRemindersOn)
+      const { sent, failed } = await sendPush(db, recipients, buildPush(duePlants))
+      console.log(`Push: ${sent} sent, ${failed} failed`)
+    } catch (err) {
+      console.error('Push notifications failed', err)
+    }
+
+    if (!tripRemindersOn) return
+
+    const { recipientEmail, senderEmail, recipientPhone, channel } = await loadData(db)
 
     await sendViaChannel(channel, {
       recipientEmail, senderEmail, recipientPhone, duePlants, log,
@@ -269,3 +334,20 @@ exports.sendTestNotification = onCall(
     return { sent: true, plantCount: duePlants.length }
   }
 )
+
+// ── On-demand test push (called from the Reminders card) ──────────
+
+exports.sendTestPush = onCall(async request => {
+  const deviceId = request.data?.deviceId
+  if (typeof deviceId !== 'string' || !deviceId) throw new HttpsError('invalid-argument', 'deviceId is required')
+
+  const db = getFirestore()
+  const deviceDoc = await db.collection('devices').doc(deviceId).get()
+  if (!deviceDoc.exists) throw new HttpsError('not-found', 'Reminders are not turned on for this device')
+
+  const { plants, log } = await loadPlantsAndLog(db)
+  const duePlants = plants.filter(p => isDue(p, log)).sort((a, b) => a.number - b.number)
+  const { sent } = await sendPush(db, [{ ...deviceDoc.data(), id: deviceDoc.id }], buildPush(duePlants, { isTest: true }))
+  if (!sent) throw new HttpsError('unavailable', 'Could not deliver to this device — try turning reminders off and on again')
+  return { sent: true, plantCount: duePlants.length }
+})

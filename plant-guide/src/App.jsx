@@ -4,12 +4,14 @@ import { usePlants } from './hooks/usePlants'
 import { useWateringLog } from './hooks/useWateringLog'
 import { useTrip } from './hooks/useTrip'
 import { useSettings } from './hooks/useSettings'
+import { useReminders, getSavedName } from './hooks/useReminders'
 import Header from './components/Header'
 import TripBanner from './components/TripBanner'
 import TodayTasks from './components/TodayTasks'
 import PlantGrid from './components/PlantGrid'
 import PlantDetail from './components/PlantDetail'
 import AdminPanel from './components/AdminPanel'
+import RemindersCard from './components/RemindersCard'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('today')
@@ -25,12 +27,13 @@ export default function App() {
   } = useWateringLog()
   const { trip, setTrip, clearTrip, getTripStatus } = useTrip()
   const { notifSettings, saveNotifSettings } = useSettings()
+  const reminders = useReminders()
 
   const tripStatus = getTripStatus()
 
   // Clears nextWaterDate override after watering so the schedule resumes normally
   async function handleLogWatering(plantId) {
-    await logWatering(plantId)
+    await logWatering(plantId, reminders.device?.name || getSavedName() || 'housemate')
     const plant = plants.find(p => p.id === plantId)
     if (plant?.nextWaterDate) {
       updatePlant(plantId, { nextWaterDate: null })
@@ -85,6 +88,8 @@ export default function App() {
 
       <main className="main">
         <TripBanner trip={trip} status={tripStatus} />
+
+        {activeTab === 'today' && <RemindersCard reminders={reminders} isAdmin={isAdmin} />}
 
         {activeTab === 'today' && (
           <TodayTasks

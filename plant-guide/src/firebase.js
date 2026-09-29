@@ -15,6 +15,6 @@ export const isConfigured = Object.values(firebaseConfig).every(
   v => v && !v.startsWith('your-')
 )
 
-const app = isConfigured ? initializeApp(firebaseConfig) : null
+export const app = isConfigured ? initializeApp(firebaseConfig) : null
 export const db = app ? getFirestore(app) : null
 export const fns = app ? getFunctions(app) : null
