@@ -450,3 +450,18 @@ Twilio requires A2P 10DLC registration before a long-code number can send SMS in
 3. Fall/winter watering intervals — still never provided by Brock.
 4. #16/#31 `lightNeeds` still say "Direct south sun" from the old spot; review light/care notes for moved plants.
 5. Install Playwright MCP to click-test the window sections and the bulk-edit v3 pop-ups (only server-render smoke-tested so far).
+
+---
+
+### Session 10 — Installable iPhone app + push reminders (2026-09-28)
+
+**Goal (Brock):** use it like a normal iPhone app, for him plus Cole/sitters. Reminders: Brock's phone **every day** plants are due; everyone else **only during a set trip**. Chose a PWA over an App Store app (no $99/yr, sitters just "Add to Home Screen").
+
+- **Installable:** `public/manifest.json` (scope/start `/plant-guide/`, standalone), `apple-touch-icon.png` / `icon-192.png` / `icon-512.png` (rendered from the 🌿 emoji via `qlmanage`, full-bleed since iOS rounds corners), iOS meta tags in `index.html`.
+- **Service worker `public/sw.js`:** only shows pushes + opens the app on tap. **No offline caching on purpose** — a SW cache on top of GitHub Pages caching would hide deploys.
+- **Push via Firebase Cloud Messaging** (default FCM VAPID key — no console setup, no new secrets). `src/hooks/useReminders.js` registers the SW, gets a token, and stores one doc per phone in Firestore `devices/{random deviceId}` = `{ token, name, alwaysRemind, updatedAt }` (deviceId + name in localStorage; name is also used as `wateredBy` on Mark Watered). Token refreshed on each app open.
+- **`RemindersCard`** at the top of the Today tab: install steps on iPhone Safari → name + "Turn on reminders" in the installed app → "Reminders on" with **Send test** / **Turn off**. The **every-day** checkbox (setup and on-card toggle) only shows when admin-unlocked (PIN) — that's how Brock's phone differs from sitters'. "Not now" leaves a small re-open link.
+- **Functions:** `dailyWateringNotification` now loads due plants first, pushes to `alwaysRemind` devices every day and to all devices when a trip is active **and** the Notifications "enabled" switch is on, then (trip only) sends the email/text as before. New callable `sendTestPush({deviceId})`. Dead tokens are deleted automatically. Push text is grouped by window.
+- **iOS gotchas learned:** (1) a data-only FCM message was accepted by FCM but never shown — adding a `webpush.notification` block fixed delivery; (2) notifications landed in Notification Center with **no banner** — that's the phone's per-app setting (Settings → Notifications → Plants → Banners, Scheduled Summary, Focus), not the app. Tell every new user to check it.
+- Brock's phone: installed, reminders on, test push delivered (banner setting pending on his side).
+- Twilio is now likely unnecessary — push covers "text-like" reminders. Decide later whether to close the account (steps in Session 8).
