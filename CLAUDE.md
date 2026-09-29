@@ -441,6 +441,9 @@ Twilio requires A2P 10DLC registration before a long-code number can send SMS in
 - `claude` CLI is not on PATH inside the VSCode extension, so `claude mcp add` doesn't work from Bash here — add Playwright via `/mcp` → Add server (stdio: `npx -y @playwright/mcp@latest`) or a root `.mcp.json`, then restart.
 - Commits `caf247d` (relocation), `e6e7978` (header style), `e292203` (Today sections) — all deployed and confirmed live; Brock confirmed both views look right.
 
+- **Trip moved:** on 2026-09-28 Brock changed the India trip start to **10/15/26** (was 10/1) in Admin Panel → Trip. Emails are trip-gated, so they follow the new dates with no code change.
+- Brock tested bulk **Add past watering** on the live site — works. Update location / Watering schedule pop-ups not yet exercised.
+
 **Pending:**
 1. ~~Confirm relocation applied~~ — confirmed by Brock 2026-09-27.
 2. Twilio A2P Campaign still "In Review" (see Session 8); email-only notifications cover the trip.
