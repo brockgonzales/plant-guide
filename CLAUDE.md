@@ -2,10 +2,11 @@
 
 ## Project Overview
 
-A digital plant care guide web app built so Brock's housemate can care for ~28 houseplants while Brock travels internationally. Brock can check in from abroad via the same app. The goal was a simple, photo-first interface that requires zero plant knowledge to follow.
+A photo-first plant care app so Brock's housemate Cole — or any house/plant sitter — can care for ~30 houseplants while Brock travels, with zero plant knowledge. Brock checks in from abroad on the same app. It runs as an **installable iPhone app (PWA)**: added to the home screen from Safari, opens full-screen, and sends **push notifications** for plants due that day — every day for Brock's phone, and only during a set trip for everyone else. Plants are organized by the window they sit in (Desk / Kitchen / Living Room / Stairwell).
 
 **Live URL:** https://brockgonzales.github.io/plant-guide/
-**GitHub repo:** https://github.com/brockgonzales/plant-guide
+**GitHub repo:** https://github.com/brockgonzales/plant-guide (formerly under account `nbrs5fydfg-dot` — ignore any old references to it)
+**Firebase project:** `brocks-plant-guide`
 **Local root:** `/Users/brockgonzales/Documents/Claude/Projects/Plants/`
 
 ---
@@ -15,13 +16,14 @@ A digital plant care guide web app built so Brock's housemate can care for ~28 h
 | Layer | Choice | Why |
 |---|---|---|
 | Framework | React 18 + Vite 5 | Fast dev, small bundle |
+| App shell | PWA — `manifest.json`, home-screen icons, `sw.js` | Installs like an app on iPhone; no App Store, no $99/yr, sitters just "Add to Home Screen" |
 | Database | Firebase Firestore | Real-time sync across devices, no server |
-| Hosting | GitHub Pages | Free, auto-deploys on push |
-| CI/CD | GitHub Actions | Builds + deploys on every push to `main` |
+| Push | Firebase Cloud Messaging (web push) | Home-screen app notifications on iOS 16.4+; default FCM VAPID key, no secrets to manage |
+| Email | SendGrid (`@sendgrid/mail`) | Trip reminder email; single sender verified at brock.gonzales@gmail.com |
+| Text | Twilio | SMS channel built but **not live** — A2P 10DLC campaign still in carrier review; push has largely replaced it |
+| Functions | Firebase Cloud Functions v2 (Node 22) | Daily 8am PT reminder job + on-demand test email/text and test push |
+| Hosting | GitHub Pages via GitHub Actions | Free, auto-deploys the frontend on every push to `main` |
 | Styling | Vanilla CSS (no UI library) | Full control, no dependency overhead |
-| Email | SendGrid (@sendgrid/mail) | Transactional email via Cloud Functions; single sender verified at brock.gonzales@gmail.com |
-| Text | Twilio | SMS notifications via Cloud Functions; channel toggle (email/text/both) set in Admin Panel |
-| Functions | Firebase Cloud Functions v2 | Scheduled daily notification (trip-gated, only for plants due that day) + on-demand test notification |
 
 ---
 
@@ -31,96 +33,124 @@ A digital plant care guide web app built so Brock's housemate can care for ~28 h
 Plants/                              ← git repo root
 ├── CLAUDE.md                        ← this file
 ├── plant_care_guide.md              ← plant-by-plant care reference (non-app doc)
-├── firebase.json                    ← Firebase project config (functions source + Node 22 runtime)
-├── .firebaserc                      ← Firebase project alias (brocks-plant-guide)
-├── .github/
-│   └── workflows/
-│       └── deploy.yml               ← GitHub Actions CI/CD (MUST be at repo root, not in plant-guide/)
-├── .gitignore
-├── functions/                       ← Firebase Cloud Functions
-│   ├── index.js                     ← dailyWateringNotification + sendTestNotification
-│   └── package.json                 ← @sendgrid/mail, firebase-admin, firebase-functions
-└── plant-guide/                     ← Vite app source
+├── firebase.json / .firebaserc      ← Firebase config (functions source, Node 22) / project alias
+├── .github/workflows/deploy.yml     ← CI/CD — MUST be at repo root, not in plant-guide/
+├── .gitignore                       ← includes `Plant Pictures/` (raw iPhone photos, GPS-tagged)
+├── Plant Pictures/<Window>/         ← raw photos by location (local only, never committed)
+├── functions/
+│   ├── index.js                     ← dailyWateringNotification, sendTestNotification, sendTestPush
+│   └── package.json                 ← firebase-admin, firebase-functions, @sendgrid/mail, twilio
+└── plant-guide/                     ← Vite app
+    ├── index.html                   ← iOS app meta tags, manifest + apple-touch-icon links
     ├── public/
-    │   ├── images/                  ← plant photos: plant-1.jpg through plant-29.jpg
-    │   ├── privacy-policy.html      ← static page, required for Twilio A2P 10DLC campaign registration
-    │   └── terms.html               ← static page, required for Twilio A2P 10DLC campaign registration
+    │   ├── manifest.json            ← PWA manifest (scope/start_url /plant-guide/, standalone)
+    │   ├── sw.js                    ← service worker: show pushes + open app on tap (no caching)
+    │   ├── apple-touch-icon.png, icon-192.png, icon-512.png
+    │   ├── images/plant-N-v2.jpg    ← current photos (EXIF/GPS stripped); plant-N.jpg = older, unused
+    │   ├── privacy-policy.html      ← required for Twilio A2P registration
+    │   └── terms.html               ← required for Twilio A2P registration
     ├── src/
-    │   ├── App.jsx                  ← root: state, tab routing, admin auth lift
-    │   ├── main.jsx
+    │   ├── App.jsx                  ← root: tabs, admin auth lift, reminders hook, Mark Watered (records phone name)
+    │   ├── firebase.js              ← Firebase init; exports app, db, fns
     │   ├── index.css                ← all styles, CSS custom properties
-    │   ├── firebase.js              ← Firebase init, exports `db`
     │   ├── components/
-    │   │   ├── Header.jsx           ← tabs (Today / All Plants) + admin gear icon
-    │   │   ├── TodayTasks.jsx       ← due-plant cards, completed pills, water date rows
-    │   │   ├── PlantGrid.jsx        ← all-plants card grid with status badges
-    │   │   ├── PlantDetail.jsx      ← modal: full care info, watering log, edit button
-    │   │   ├── AdminPanel.jsx       ← PIN-protected: add/edit plants, set trip, watering history
-    │   │   └── TripBanner.jsx       ← "Day X of Y — Destination" banner
+    │   │   ├── Header.jsx           ← tabs (Today / All Plants) + ⚙️ admin
+    │   │   ├── RemindersCard.jsx    ← Today-tab card: install steps, turn on reminders, test/off, every-day toggle
+    │   │   ├── TodayTasks.jsx       ← due plants grouped by window + "Completed today"
+    │   │   ├── PlantGrid.jsx        ← All Plants grouped by window
+    │   │   ├── PlantCard.jsx        ← card in the grid
+    │   │   ├── PlantDetail.jsx      ← modal: care info, watering log, ✏️ edit
+    │   │   ├── AdminPanel.jsx       ← PIN: trip, plant list w/ checkboxes + bulk pop-ups, add/edit, notifications
+    │   │   └── TripBanner.jsx       ← "Day X of Y — Destination"
     │   ├── hooks/
-    │   │   ├── usePlants.js         ← Firestore `plants` collection CRUD + real-time sync
-    │   │   ├── useWateringLog.js    ← `wateringLog` collection: log, status, history editing
-    │   │   ├── useTrip.js           ← `trips` collection: set/clear trip dates + housemate note
-    │   │   └── useSettings.js       ← `settings/notifications` doc: email toggle + addresses
+    │   │   ├── usePlants.js         ← `plants` CRUD + sync; runs one-time data updates
+    │   │   ├── useWateringLog.js    ← `wateringLog`: log, status, history edits
+    │   │   ├── useTrip.js           ← `config/currentTrip` doc
+    │   │   ├── useSettings.js       ← `settings/notifications` doc
+    │   │   └── useReminders.js      ← push opt-in: SW registration, FCM token, `devices/{id}` doc
     │   └── data/
-    │       └── initialPlants.js     ← seed data (run once), WATERING_METHODS map
+    │       ├── locations.js         ← LOCATION_ORDER + groupByLocation() (shared by all grouped views)
+    │       ├── relocation2026.js    ← one-time Sept 2026 relocation update (flag-guarded)
+    │       └── initialPlants.js     ← original seed data + WATERING_METHODS (seed only, not authoritative)
     ├── vite.config.js               ← base: '/plant-guide/' — must match GitHub repo name
-    ├── package.json
     └── .env.local                   ← local dev secrets (not committed)
 ```
 
 ---
 
+## Firestore Data Model
+
+| Path | Contents |
+|---|---|
+| `plants/plant-N` | `{ number, name, species, location, wateringIntervalDays, wateringIntervalMaxDays, wateringMethod, simpleInstruction, lightNeeds, careNotes, warnings[], isActive, hasPhoto, photoPath, nextWaterDate? }` |
+| `wateringLog/{auto}` | `{ plantId, wateredAt: Timestamp, wateredBy, note }` — `wateredBy` is the phone's reminder name (e.g. "Cole"), `'manual'` for admin-added past waterings |
+| `config/currentTrip` | `{ destination, startDate, endDate, hosteeNote }` — gates sitter reminders + email |
+| `config/migrations` | flags for one-time data updates, e.g. `relocation2026_09: true` |
+| `settings/notifications` | `{ enabled, channel: 'email'\|'text'\|'both', recipientEmail, senderEmail, recipientPhone }` |
+| `devices/{random id}` | one per phone with reminders on: `{ token, name, alwaysRemind, updatedAt }` |
+
+---
+
 ## Deployment
 
-### How it works
-Every `git push` to `main` triggers GitHub Actions, which:
-1. Installs npm dependencies (`plant-guide/`)
-2. Runs `npm run build` with Firebase secrets injected as env vars
-3. Uploads `plant-guide/dist/` as the Pages artifact
-4. Deploys to `https://nbrs5fydfg-dot.github.io/plant-guide/`
+### Frontend (automatic)
+Every `git push` to `main` triggers GitHub Actions: install deps in `plant-guide/` → `npm run build` with the 7 secrets injected → deploy `plant-guide/dist/` to GitHub Pages. Takes ~2 minutes. Check at https://github.com/brockgonzales/plant-guide/actions.
 
-### Critical configuration
-- Vite `base` in `vite.config.js` **must** be `/plant-guide/` — this is the GitHub repo name. If the repo is ever renamed, both must change together.
-- `deploy.yml` **must** live at `.github/workflows/deploy.yml` at the repo root. GitHub Actions does not look inside subdirectories.
-- 7 secrets stored in GitHub repo Settings → Secrets → Actions:
-  - `VITE_FIREBASE_API_KEY`
-  - `VITE_FIREBASE_AUTH_DOMAIN`
-  - `VITE_FIREBASE_PROJECT_ID`
-  - `VITE_FIREBASE_STORAGE_BUCKET`
-  - `VITE_FIREBASE_MESSAGING_SENDER_ID`
-  - `VITE_FIREBASE_APP_ID`
-  - `VITE_ADMIN_PIN`
+- Vite `base` **must** be `/plant-guide/` (the repo name) — the manifest, icons, and service worker scope all assume it too.
+- `deploy.yml` **must** live at the repo-root `.github/workflows/`.
+- GitHub repo secrets (Settings → Secrets → Actions): `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`, `VITE_ADMIN_PIN`.
+- **Verify a deploy is live** by polling the live bundle for a string unique to the change (e.g. `curl` the `assets/index-*.js` named in `index.html` and `grep`), not by trusting the Actions tick alone.
 
-### Deploy a change
+### Cloud Functions (manual)
 ```bash
 cd /Users/brockgonzales/Documents/Claude/Projects/Plants
-git add plant-guide/src/      # or specific files
-git commit -m "description"
-git push
+firebase deploy --only functions            # or --only functions:sendTestPush,...
+firebase functions:log --only sendTestPush  # read logs
 ```
-GitHub Actions runs automatically. Check progress at: https://github.com/nbrs5fydfg-dot/plant-guide/actions
+Functions are **not** deployed by GitHub Actions. Secrets in Firebase Secret Manager: `SENDGRID_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` (plus unused `GMAIL_APP_PASSWORD`). Push needs no secret.
 
-### After deploy — browser cache note
-GitHub Pages sets long cache lifetimes on JS/CSS assets. If the live site looks stale after a green deploy, open an incognito window or use DevTools → right-click reload → "Empty Cache and Hard Reload."
+### Caching
+GitHub Pages caches JS/CSS. If the site looks stale after a deploy: incognito window, hard reload, or on iPhone fully close the home-screen app (swipe it away in the app switcher) and reopen.
+
+### Photos
+New plant photos: resize to 1200px on the long side, apply EXIF orientation, and **re-encode with no metadata** (iPhone photos carry GPS pointing at Brock's home and the site is public). No exiftool/ImageMagick on this Mac — use Pillow in a scratch venv. Save as `public/images/plant-N-v2.jpg` (new filename busts caches) and set `photoPath` on the plant. Older GPS-tagged photos still exist in public git history — only fixable with a history rewrite; Brock's call.
 
 ---
 
 ## Key Architecture Decisions
 
-**Admin auth state lifted to App.jsx** — `isAdmin` lives in App so the ✏️ Edit button in PlantDetail (a separate modal) is visible once the PIN is entered, even if AdminPanel is closed and reopened. AdminPanel calls `onAdminAuth()` on PIN success; clicking Edit in PlantDetail calls `handleEditPlant(plant)` which sets `adminDirectPlant` and opens AdminPanel directly in edit mode via lazy state initialization.
+**Grouping by window** — `src/data/locations.js` defines `LOCATION_ORDER` (Desk / Kitchen / Living Room / Stairwell Window) and `groupByLocation()`. All Plants, the Today due list, and the Admin plant list render one section per window with a `.location-section__title` header (20px bold `--green-700`); anything with another location string lands in a trailing "Other" section (Admin adds "Removed" for inactive plants). Location is therefore an exact-match string — the bulk "Update location" pop-up uses a dropdown so it can't be typo'd. The header selector is `.location-sections .location-section__title` on purpose so `.admin-section h3` can't override it.
 
-**`plant.nextWaterDate` override field** — Optional date string on each plant document. When set, `getWateringStatus` and `getNextWaterDate` use it instead of calculating from watering log. Auto-cleared in `handleLogWatering` when the plant is watered, so the schedule resumes normally.
+**One-time data updates run in the client** — Claude can't write to Firestore from the dev machine (no credentials; the auto-mode classifier blocks credential access). Bulk data changes ship as code: a module like `relocation2026.js` called from `usePlants`' snapshot handler, doing one `writeBatch` and setting a `config/migrations` flag so it runs exactly once and never overwrites later Admin edits. It applies the first time anyone opens the app after deploy. Precedent: plants 28/29 seeding and plant-18 deactivation in `usePlants.js`.
 
-**Watering log is Firestore, not plant-document state** — Each watering event is a separate `wateringLog` document (`{ plantId, wateredAt: Timestamp, wateredBy, note }`). `useWateringLog` subscribes with `onSnapshot` so changes (including history edits) propagate in real-time across all open devices.
+**Reminder routing** — each opted-in phone is a `devices` doc. The daily job (8am PT) computes due plants; if none, nothing is sent. Push goes to `alwaysRemind` devices every due day, and to **all** devices when a trip is active **and** `settings/notifications.enabled` is on. Email/text go out only in that trip case. The `alwaysRemind` checkbox is only shown when admin-unlocked (PIN), so sitter phones are trip-only by default. Dead FCM tokens are deleted automatically.
 
-**No router** — Single-page, tab-based navigation managed with `useState`. Deep links are not needed for this use case.
+**Service worker does no caching** — `sw.js` only displays pushes and focuses/opens the app on tap. A caching SW on top of GitHub Pages' caching would hide deploys. On iOS every push must show a notification or permission is revoked, so the SW always calls `showNotification`. Messages include a `webpush.notification` block — data-only FCM messages were accepted by FCM but never shown on iPhone.
+
+**Bulk editing lives on the Admin plant list** — checkboxes + 72px photos on every active row (Brock identifies plants by photo, not name), "Select all plants", and a sticky bar with **Update location / Add past watering / Watering schedule**, each a pop-up listing affected plants that only closes via Cancel/Apply. The admin backdrop won't close the panel while plants are selected, and sub-views only close via ✕ or ← Back (prevents the Session 7 data-loss bug).
+
+**Admin auth state lifted to App.jsx** — `isAdmin` lives in App so the ✏️ Edit button in PlantDetail and the every-day reminder toggle work once the PIN is entered. It is in-memory only, so it resets when the app is relaunched. The PIN (`VITE_ADMIN_PIN`) is compiled into the public bundle — fine for a household tool, not real security.
+
+**`plant.nextWaterDate` override field** — optional date on a plant; when set, status/next-date use it instead of the log. Auto-cleared when watered via Mark Watered.
+
+**Watering log is Firestore, not plant state** — one `wateringLog` doc per watering, subscribed with `onSnapshot`, so edits propagate live to every device.
+
+**No router** — tabs via `useState`; deep links aren't needed.
+
+---
+
+## Onboarding a Phone (Brock, Cole, or a sitter)
+
+1. Open the live URL in **Safari** (sharing the home-screen bookmark by text works — the recipient still has to do step 2).
+2. Share → **Add to Home Screen** → Add. Always open **Plants** from the icon afterwards.
+3. Today tab → reminders card → enter a name → **Turn on reminders** → Allow. Sitters are trip-only automatically. Brock: enter the PIN (⚙️) first, or afterwards tick **Remind me every day** on the card.
+4. **Send test**. If it lands in Notification Center with no banner: iPhone **Settings → Notifications → Plants → Banners** on; remove Plants from **Scheduled Summary**; check Focus. That's a phone setting, not the app.
 
 ---
 
 ## Plant Inventory
 
-As of the Sept 2026 repot (Session 9): 30 active plants, numbered 1–33, grouped into four window locations. Retired: #5 Prayer Plant (deceased), #18 (duplicate of #9), #25 African Violet (deceased Sept 2026). Location strings must match exactly — `PlantGrid` groups on them and anything else lands in "Other".
+As of the Sept 2026 repot (Session 9): 30 active plants, numbered 1–33, grouped into four window locations. Retired: #5 Prayer Plant (deceased), #18 (duplicate of #9), #25 African Violet (deceased Sept 2026). Location strings must match exactly — `groupByLocation()` groups on them and anything else lands in "Other".
 
 - **Desk Window:** #16 Heartleaf Philodendron (1 of 2), #23 Autograph Tree, #32 Pink Nerve Plant
 - **Kitchen Window:** #3 Red Nerve Plant, #12 Chinese Evergreen green/cream, #28 Neon Pothos, #33 Baby Rubber Plant (Peperomia obtusifolia)
@@ -140,6 +170,11 @@ npm run dev       # starts at localhost:5173
 ```
 
 Requires a `.env.local` file in `plant-guide/` with the 7 Firebase + PIN variables (same keys as GitHub secrets).
+
+- **The dev server talks to the production Firestore.** Opening it in a browser writes real data and runs any pending one-time data update.
+- **No browser tool yet** (Playwright MCP not installed — add via `/mcp` → Add server, stdio `npx -y @playwright/mcp@latest`; the `claude` CLI isn't on PATH inside the VSCode extension). Until then, verify UI with `npm run build` plus a server-render smoke test: `vite.createServer({ server: { middlewareMode: true }, appType: 'custom' })`, load the component with `ssrLoadModule`, import `react`/`react-dom/server` natively (not via `ssrLoadModule`), and `renderToString` with mock props. Run it with `node --input-type=module -e` from `plant-guide/` so `vite` resolves.
+- Push notifications only work in the **installed** iPhone app (iOS 16.4+) or desktop browsers that support web push — not in iPhone Safari tabs.
+- Regenerating the app icon: render a full-bleed square SVG with `qlmanage -t -s 1024` (it draws emoji), then resize to 180/192/512 with Pillow.
 
 ---
 
@@ -439,7 +474,7 @@ Twilio requires A2P 10DLC registration before a long-code number can send SMS in
 - Data was applied via a one-time client-side update, `src/data/relocation2026.js`, called from `usePlants`. It runs once on the first app load after deploy, in a single Firestore batch, and sets `config/migrations.relocation2026_09 = true` so it never re-runs or overwrites later Admin Panel edits. #30/#31 are cloned from the live #10/#16 docs (minus any `nextWaterDate` override).
 - **Privacy fix:** every published plant photo carried iPhone GPS EXIF pointing at Brock's home. All `public/images/plant-*.jpg` were re-encoded without EXIF (Pillow in a scratch venv; no exiftool on this machine). Raw `Plant Pictures/` is gitignored. The old GPS-tagged images still exist in the public repo's git history — cleaning that needs a history rewrite + force-push, not done; Brock's call (making the repo private is the simpler option).
 - `claude` CLI is not on PATH inside the VSCode extension, so `claude mcp add` doesn't work from Bash here — add Playwright via `/mcp` → Add server (stdio: `npx -y @playwright/mcp@latest`) or a root `.mcp.json`, then restart.
-- Commits `caf247d` (relocation), `e6e7978` (header style), `e292203` (Today sections) — all deployed and confirmed live; Brock confirmed both views look right.
+- Commits `caf247d` (relocation), `e6e7978` (header style), `e292203` (Today sections), `83a4b8c` (bulk-edit list sections), `fdb61fa` (Admin list sections + "Removed"), `5e68c04` (bulk edit v3), `9cd0467` (trip moved to 10/15) — all deployed and confirmed live; Brock confirmed the views and tested bulk Add past watering.
 
 - **Trip moved:** on 2026-09-28 Brock changed the India trip start to **10/15/26** (was 10/1) in Admin Panel → Trip. Emails are trip-gated, so they follow the new dates with no code change.
 - Brock tested bulk **Add past watering** on the live site — works. Update location / Watering schedule pop-ups not yet exercised.
@@ -465,3 +500,18 @@ Twilio requires A2P 10DLC registration before a long-code number can send SMS in
 - **iOS gotchas learned:** (1) a data-only FCM message was accepted by FCM but never shown — adding a `webpush.notification` block fixed delivery; (2) notifications landed in Notification Center with **no banner** — that's the phone's per-app setting (Settings → Notifications → Plants → Banners, Scheduled Summary, Focus), not the app. Tell every new user to check it.
 - Brock's phone: installed, reminders on, test push delivered (banner setting pending on his side).
 - Twilio is now likely unnecessary — push covers "text-like" reminders. Decide later whether to close the account (steps in Session 8).
+- **Follow-ups (2026-09-30):** Brock asked whether sharing the home-screen bookmark by text to Cole works — yes, but Cole still has to open it in Safari and Add to Home Screen. Confirmed Cole's phone is trip-only automatically (the every-day option needs the PIN), and her daily pushes need both an active trip and the Notifications "enabled" switch. Documentation overhauled: CLAUDE.md reference sections (stack, directory tree, Firestore data model, deploy for frontend vs functions, photo/EXIF rule, architecture decisions, phone onboarding), `plant_care_guide.md` current-locations section, and memory files.
+- Commits: `54edcf4` (installable app + push), `5e6cc9a` (iOS delivery fix + every-day toggle), `47f1d8a` / later (docs).
+
+---
+
+## Current Open Items (as of 2026-09-30)
+
+1. **Cole's phone** — install the app and turn on reminders before the trip (now starting **10/15/26**; end date is in Admin Panel → Trip). Have her run **Send test** and check the banner setting.
+2. **Brock's banner setting** — confirm banners pop up after changing Settings → Notifications → Plants.
+3. **Twilio** — campaign still "In Review". Probably not needed now that push works; decide whether to close the account (steps in Session 8).
+4. **Fall/winter watering intervals** — never provided; Brock can enter them himself via Admin → select plants → **Watering schedule**.
+5. **Care notes for moved plants** — `lightNeeds` / `careNotes` still describe old spots (e.g. #16/#31 "Direct south sun"). Window orientations for Desk/Stairwell are unknown — ask before rewriting.
+6. **Click-test** the Update location and Watering schedule pop-ups (only Add past watering has been tried by Brock).
+7. **Optional:** scrub GPS-tagged photos from public git history (force-push) or make the repo private; group "Completed today" by window; group the reminder email by window.
+

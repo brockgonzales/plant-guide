@@ -6,7 +6,20 @@
 
 ---
 
-## Plant Inventory & Care, by Room
+## Current Locations (after the Sept 2026 repot)
+
+Every plant was repotted and moved into four window groups in September 2026. The app groups plants the same way, and it is the live source of truth for locations and watering schedules.
+
+- **Desk Window:** #16 Heartleaf Philodendron (1 of 2), #23 Autograph Tree, #32 Pink Nerve Plant
+- **Kitchen Window:** #3 Red Nerve Plant, #12 Chinese Evergreen (green/cream), #28 Neon Pothos, #33 Baby Rubber Plant
+- **Living Room Window:** #7 Zebra Plant, #10 Black Rubber Plant (1 of 2), #13 Chinese Evergreen (white/silver), #30 Black Rubber Plant (2 of 2)
+- **Stairwell Window:** #1 & #2 Raven ZZ, #4 Cast Iron Plant, #6 Ripple Peperomia, #8 Dragon Tree, #9 White/green Nerve Plant, #11 Stromanthe 'Triostar', #14 Silver-blue Philodendron, #15 Snake Plant, #17 Anthurium, #19 Corn Plant, #20 Rubber Plant 'Tineke', #21 Jade Plant, #22 Purple Passion, #24 Wandering Dude, #26 Red Chinese Evergreen, #27 White/Cream Chinese Evergreen, #29 Philodendron 'Prince of Orange', #31 Heartleaf Philodendron (2 of 2)
+
+> The per-plant notes below were written for each plant's **previous** spot. The species care (watering, humidity, pests) still applies. Anything about light or "move this plant" may not — the new windows' directions haven't been recorded yet.
+
+---
+
+## Plant Care, by Previous Room (pre–Sept 2026)
 
 ### Hallway — South-facing window (brightest spot)
 
@@ -89,13 +102,10 @@ Wants bright light to keep its vivid purple. In medium indirect north light it'l
 **Plant 23 — Autograph tree / Hoya** — medium indirect, weekly watering ⚠️
 Browning and curling leaves suggest weekly watering is too much for a north window where soil stays moist longer. These are semi-succulent and prefer to dry out between waterings. Try every 2 weeks. North light is also on the low end — it'd prefer a living room or hallway south window.
 
-### New Additions (location TBD)
+### Later Additions
 
 **Plant 24 — Wandering Dude** *(Tradescantia zebrina)* — bright indirect to indirect, weekly watering
 Thrives in bright indirect light but tolerates lower light — color vibrancy (that deep purple underside and silver-green stripe) is strongest with more light. Water when the top inch of soil is dry; it wilts dramatically when thirsty but bounces back quickly. Trim leggy stems to keep it full and bushy. Fast grower, easy to propagate from cuttings in water. Not toxic to humans but mildly irritating to pet skin, so keep away from cats and dogs.
-
-**Plant 25 — African Violet** *(Streptocarpus ionantha)* — bright indirect, weekly light watering ⚠️
-Bright indirect is essential — too little light and it stops blooming, too much direct sun scorches the fuzzy leaves. Water from the bottom (set the pot in a saucer of water for 20–30 minutes, then drain) to avoid crown rot; water on the leaves causes brown spots. Room-temperature water only — cold water leaves white rings on the leaves. Fertilize every 2–4 weeks with an African violet fertilizer to sustain blooming. Humidity-sensitive; the dry indoor air here may cause leaf curl in winter.
 
 **Plant 26 — Red Chinese Evergreen** *(Aglaonema, red/pink variety — likely 'Siam Aurora' or similar)* — bright indirect, weekly watering ⚠️
 Unlike the green aglaonemas (12, 13) which tolerate lower light, red and pink varieties need brighter conditions to hold their vivid color — medium indirect at minimum, bright indirect preferred. The flower spike forming is normal; let it develop or remove it early to redirect energy to foliage (the blooms aren't ornamental). Water when the top half of the soil is dry; this is one of the easier aglaonemas to care for. Watch the color — if the red fades to plain green, it needs more light.
@@ -103,15 +113,33 @@ Unlike the green aglaonemas (12, 13) which tolerate lower light, red and pink va
 **Plant 27 — White/Cream Chinese Evergreen** *(Aglaonema, green/white mottled variety)* — medium to bright indirect, light watering
 The heavy cream-and-white variegation means less chlorophyll, so it needs more light than the all-green varieties — medium indirect at minimum or the pale patches may brown at the edges. Water conservatively; these rot easily in soggy soil. Let the top 1–2 inches dry out between waterings. No cold drafts — aglaonemas are tropical and sulk below 60°F. The full, bushy form in the photo is a sign it's been happy; maintain consistent light and avoid repotting until roots show through drainage holes.
 
+### Added in the Sept 2026 repot
+
+**Plant 30 — Black Rubber Plant (2 of 2)** *(Ficus elastica 'Burgundy')* — split from #10 during repotting
+Same care as #10: full kitchen-sink soak every 2 weeks, drain completely, and keep it up on a stand near the window — rubber plants drop leaves in low light.
+
+**Plant 31 — Heartleaf Philodendron (2 of 2)** *(Philodendron hederaceum)* — split from #16 during repotting
+Same care as #16: light watering weekly, just enough to moisten the top inch. The new pot is small, so it may dry out faster than #16 at first.
+
+**Plant 32 — Pink Nerve Plant** *(Fittonia albivenis, pink-veined)* — new
+Same care as the Red Nerve Plant (#3): water weekly to keep the soil lightly moist and mist every few days. It collapses dramatically when thirsty but recovers within hours of watering. Bright indirect light — direct sun scorches it.
+
+**Plant 33 — Baby Rubber Plant** *(Peperomia obtusifolia)* — new
+Thick, glossy leaves store water, so overwatering is the main risk. Water from the top every 10–14 days, only when the top half of the soil is dry, and empty the saucer. Soft or yellowing leaves mean too much water. Bright indirect light.
+
 ---
 
 ### Deceased
+
+**Plant 25 — African Violet** *(Saintpaulia ionantha)* — Didn't survive the September 2026 repot.
 
 **Plant 5 — Prayer plant** *(Maranta leuconeura)* — Rest in peace. Notoriously finicky about humidity and water quality; Seattle's dry indoor air is their nemesis. Not your fault.
 
 ---
 
 ## Top Action Items
+
+*Written before the Sept 2026 repot. Several may already be done or no longer apply after the move — check against the current locations above.*
 
 The most impactful changes, in order:
 
