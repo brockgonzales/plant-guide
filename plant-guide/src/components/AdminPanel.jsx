@@ -238,7 +238,7 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
 
   async function saveNotif() {
     if (!notifForm || !saveNotifSettings) return
-    await saveNotifSettings(notifForm)
+    await saveNotifSettings({ ...notifForm, channel: 'email' })
     setNotifSaved(true)
     setTimeout(() => setNotifSaved(false), 3000)
   }
@@ -413,52 +413,25 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                     </span>
                     {notifForm.enabled && (
                       <div className="form-grid" style={{ marginTop: 12 }}>
-                        <label className="form-label form-label--full">Notify by
-                          <select
+                        <label className="form-label form-label--full">Notify email
+                          <input
                             className="input"
-                            value={notifForm.channel || 'email'}
-                            onChange={e => setNotifForm(f => ({ ...f, channel: e.target.value }))}
-                          >
-                            <option value="email">Email only</option>
-                            <option value="text">Text only</option>
-                            <option value="both">Email and text</option>
-                          </select>
+                            type="email"
+                            value={notifForm.recipientEmail}
+                            onChange={e => setNotifForm(f => ({ ...f, recipientEmail: e.target.value }))}
+                            placeholder="mills.colleenk@gmail.com"
+                          />
                         </label>
-                        {(notifForm.channel === 'email' || notifForm.channel === 'both' || !notifForm.channel) && (
-                          <>
-                            <label className="form-label form-label--full">Notify email
-                              <input
-                                className="input"
-                                type="email"
-                                value={notifForm.recipientEmail}
-                                onChange={e => setNotifForm(f => ({ ...f, recipientEmail: e.target.value }))}
-                                placeholder="mills.colleenk@gmail.com"
-                              />
-                            </label>
-                            <label className="form-label form-label--full">Send from
-                              <input
-                                className="input"
-                                type="email"
-                                value={notifForm.senderEmail}
-                                onChange={e => setNotifForm(f => ({ ...f, senderEmail: e.target.value }))}
-                                placeholder="brock.gonzales@gmail.com"
-                              />
-                              <span className="form-hint">Must be the SendGrid verified sender address.</span>
-                            </label>
-                          </>
-                        )}
-                        {(notifForm.channel === 'text' || notifForm.channel === 'both') && (
-                          <label className="form-label form-label--full">Notify phone
-                            <input
-                              className="input"
-                              type="tel"
-                              value={notifForm.recipientPhone}
-                              onChange={e => setNotifForm(f => ({ ...f, recipientPhone: e.target.value }))}
-                              placeholder="+12065551234"
-                            />
-                            <span className="form-hint">Full number with country code, e.g. +1 for US.</span>
-                          </label>
-                        )}
+                        <label className="form-label form-label--full">Send from
+                          <input
+                            className="input"
+                            type="email"
+                            value={notifForm.senderEmail}
+                            onChange={e => setNotifForm(f => ({ ...f, senderEmail: e.target.value }))}
+                            placeholder="brock.gonzales@gmail.com"
+                          />
+                          <span className="form-hint">Must be the SendGrid verified sender address.</span>
+                        </label>
                       </div>
                     )}
                     <div className="notif-save-row">
@@ -469,7 +442,7 @@ export default function AdminPanel({ plants, trip, tripStatus, addPlant, updateP
                     </div>
                     <div className="notif-save-row" style={{ marginTop: 8 }}>
                       <button className="btn btn--sm" onClick={sendTestEmail} disabled={testSending}>
-                        {testSending ? 'Sending…' : 'Send Test Notification'}
+                        {testSending ? 'Sending…' : 'Send Test Email'}
                       </button>
                       {testMsg && <span className="notif-saved-msg">{testMsg}</span>}
                     </div>

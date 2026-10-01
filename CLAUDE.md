@@ -20,7 +20,7 @@ A photo-first plant care app so Brock's housemate Cole — or any house/plant si
 | Database | Firebase Firestore | Real-time sync across devices, no server |
 | Push | Firebase Cloud Messaging (web push) | Home-screen app notifications on iOS 16.4+; default FCM VAPID key, no secrets to manage |
 | Email | SendGrid (`@sendgrid/mail`) | Trip reminder email; single sender verified at brock.gonzales@gmail.com |
-| Text | Twilio | SMS channel built but **not live** — A2P 10DLC campaign still in carrier review; push has largely replaced it |
+| Text | ~~Twilio~~ | **Abandoned 2026-10-01** — A2P campaign rejected 3×; push replaced it. Admin UI is email-only; SMS code still in `functions/index.js` but unreachable |
 | Functions | Firebase Cloud Functions v2 (Node 22) | Daily 8am PT reminder job + on-demand test email/text and test push |
 | Hosting | GitHub Pages via GitHub Actions | Free, auto-deploys the frontend on every push to `main` |
 | Styling | Vanilla CSS (no UI library) | Full control, no dependency overhead |
@@ -505,11 +505,17 @@ Twilio requires A2P 10DLC registration before a long-code number can send SMS in
 
 ---
 
-## Current Open Items (as of 2026-09-30)
+### Session 11 — Twilio abandoned (2026-10-01)
+
+- A2P campaign came back **rejected** again: 30882 (terms), 30896 (opt-in), 30908 (privacy policy). Root cause: no public written opt-in form; the privacy policy itself says numbers aren't collected via public sign-up. Fixing it would mean a third multi-week review that would probably finish after the trip starts.
+- Brock agreed: push notifications cover it better. He's closing the Twilio account (Console → Admin → Account Management → General settings → Close account; Twilio refunds remaining prepaid balance within ~10 business days).
+- Admin → Notifications is now **email only**: channel picker and phone field removed, save always writes `channel: 'email'`, button renamed "Send Test Email". Functions untouched (they already default to email).
+
+## Current Open Items (as of 2026-10-01)
 
 1. **Cole's phone** — install the app and turn on reminders before the trip (now starting **10/15/26**; end date is in Admin Panel → Trip). Have her run **Send test** and check the banner setting.
 2. **Brock's banner setting** — confirm banners pop up after changing Settings → Notifications → Plants.
-3. **Twilio** — campaign still "In Review". Probably not needed now that push works; decide whether to close the account (steps in Session 8).
+3. **Twilio** — abandoned 2026-10-01 (Session 11). Brock is closing the account; confirm the balance refund arrived (~10 business days). Optional cleanup: delete the 3 `TWILIO_*` secrets + SMS code from functions.
 4. **Fall/winter watering intervals** — never provided; Brock can enter them himself via Admin → select plants → **Watering schedule**.
 5. **Care notes for moved plants** — `lightNeeds` / `careNotes` still describe old spots (e.g. #16/#31 "Direct south sun"). Window orientations for Desk/Stairwell are unknown — ask before rewriting.
 6. **Click-test** the Update location and Watering schedule pop-ups (only Add past watering has been tried by Brock).
