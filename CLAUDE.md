@@ -150,12 +150,12 @@ New plant photos: resize to 1200px on the long side, apply EXIF orientation, and
 
 ## Plant Inventory
 
-As of the Sept 2026 repot (Session 9): 30 active plants, numbered 1–33, grouped into four window locations. Retired: #5 Prayer Plant (deceased), #18 (duplicate of #9), #25 African Violet (deceased Sept 2026). Location strings must match exactly — `groupByLocation()` groups on them and anything else lands in "Other".
+As of Oct 18 2026 (Session 12): 33 active plants, numbered 1–36, grouped into four window locations. Retired: #5 Prayer Plant (deceased), #18 (duplicate of #9), #25 African Violet (deceased Sept 2026). Location strings must match exactly — `groupByLocation()` groups on them and anything else lands in "Other".
 
 - **Desk Window:** #16 Heartleaf Philodendron (1 of 2), #23 Autograph Tree, #32 Pink Nerve Plant
 - **Kitchen Window:** #3 Red Nerve Plant, #12 Chinese Evergreen green/cream, #28 Neon Pothos, #33 Baby Rubber Plant (Peperomia obtusifolia)
 - **Living Room Window:** #7 Zebra Plant, #10 Black Rubber Plant (1 of 2), #13 Chinese Evergreen white/silver, #30 Black Rubber Plant (2 of 2)
-- **Stairwell Window:** #1 & #2 Raven ZZ, #4 Cast Iron Plant, #6 Ripple Peperomia, #8 Dragon Tree, #9 White/green Nerve Plant, #11 Stromanthe 'Triostar', #14 Silver-blue Philodendron, #15 Snake Plant, #17 Anthurium, #19 Corn Plant, #20 Rubber Plant 'Tineke', #21 Jade Plant, #22 Purple Passion, #24 Wandering Dude, #26 Red Chinese Evergreen 'Siam Aurora', #27 White/Cream Chinese Evergreen, #29 Philodendron 'Prince of Orange', #31 Heartleaf Philodendron (2 of 2)
+- **Stairwell Window:** #1 & #2 Raven ZZ, #4 Cast Iron Plant, #6 Ripple Peperomia, #8 Dragon Tree, #9 White/green Nerve Plant, #11 Stromanthe 'Triostar', #14 Silver-blue Philodendron, #15 Snake Plant, #17 Anthurium, #19 Corn Plant, #20 Rubber Plant 'Tineke', #21 Jade Plant, #22 Purple Passion, #24 Wandering Dude, #26 Red Chinese Evergreen 'Siam Aurora', #27 White/Cream Chinese Evergreen, #29 Philodendron 'Prince of Orange', #31 Heartleaf Philodendron (2 of 2), #34 Pink Paradise Inch Plant (Tradescantia zebrina), #35 Whisper Nerve Plant (Fittonia), #36 Silver Dragon Alocasia
 
 #30 and #31 are the halves of #10 and #16, split during repotting. Current photos are `public/images/plant-N-v2.jpg`; the older `plant-N.jpg` files are no longer referenced by active plants.
 
@@ -510,6 +510,14 @@ Twilio requires A2P 10DLC registration before a long-code number can send SMS in
 - A2P campaign came back **rejected** again: 30882 (terms), 30896 (opt-in), 30908 (privacy policy). Root cause: no public written opt-in form; the privacy policy itself says numbers aren't collected via public sign-up. Fixing it would mean a third multi-week review that would probably finish after the trip starts.
 - Brock agreed: push notifications cover it better. He's closing the Twilio account (Console → Admin → Account Management → General settings → Close account; Twilio refunds remaining prepaid balance within ~10 business days).
 - Admin → Notifications is now **email only**: channel picker and phone field removed, save always writes `channel: 'email'`, button renamed "Send Test Email". Functions untouched (they already default to email).
+
+### Session 12 — Three new plants (2026-10-18)
+
+- Brock bought three plants and placed them at the Stairwell Window (dresser under the south-facing bay window / humid corner by the humidifier): #34 Tradescantia zebrina 'Pink Paradise', #35 Fittonia 'Whisper', #36 Alocasia 'Silver Dragon'.
+- Added via a one-time client-side update, `src/data/newPlants2026_10.js`, called from `usePlants` (flag `config/migrations.newPlants2026_10`, skips ids that already exist). Each gets `nextWaterDate: 2026-10-25` because watering history is unknown, otherwise `unknown` status would make them due immediately; Mark Watered clears it.
+- Photos exported from Apple Photos with the Photos Export script, re-encoded to 1200px with no metadata as `public/images/plant-34/35/36-v2.jpg`.
+- Flagged for Brock: #26 Red Chinese Evergreen shows leaf stippling (possible spider mites); keep the new plants quarantined from it and #6 for ~2 weeks and check leaf undersides.
+- Build was not run (the Linux shell can't use the Mac's node_modules); module syntax-checked only, deploy relies on GitHub Actions.
 
 ## Current Open Items (as of 2026-10-01)
 

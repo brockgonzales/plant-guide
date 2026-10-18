@@ -13,6 +13,7 @@ import {
 import { db } from '../firebase'
 import { initialPlants } from '../data/initialPlants'
 import { applyRelocation2026 } from '../data/relocation2026'
+import { applyNewPlants2026_10 } from '../data/newPlants2026_10'
 
 export function usePlants() {
   const [plants, setPlants] = useState([])
@@ -59,6 +60,7 @@ export function usePlants() {
           }
         }
         applyRelocation2026(db, firestorePlants)
+        applyNewPlants2026_10(db, firestorePlants)
       }
     })
 
